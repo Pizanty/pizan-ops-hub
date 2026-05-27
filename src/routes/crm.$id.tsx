@@ -101,7 +101,7 @@ function LeadDetail() {
               </div>
             )}
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => save.mutate()} disabled={save.isPending}>Save</Button>
+              <Button onClick={() => save.mutate({})} disabled={save.isPending}>Save</Button>
               <Button variant="outline" onClick={markWon}>Mark Won</Button>
               <Button variant="outline" onClick={() => markLost(form.lost_reason ?? "Other")}>Mark Lost</Button>
               <LogContactDialog leadId={id} userId={user?.id} open={logOpen} onOpenChange={setLogOpen} />
