@@ -112,11 +112,11 @@ Return JSON: { summary, top_tasks:[{task_id,title,rank,reasoning}] (max 3), skip
       .insert({
         user_id: userId,
         type: data.type,
-        content: content as unknown as Record<string, unknown>,
-        tasks_snapshot: tasks,
-        leads_snapshot: leads,
-        dev_snapshot: devItems,
-        context_snapshot: ctx,
+        content: content as never,
+        tasks_snapshot: tasks as never,
+        leads_snapshot: leads as never,
+        dev_snapshot: devItems as never,
+        context_snapshot: ctx as never,
       })
       .select()
       .single();
