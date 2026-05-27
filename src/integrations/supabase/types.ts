@@ -14,16 +14,396 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      briefings: {
+        Row: {
+          content: Json
+          context_snapshot: Json | null
+          dev_snapshot: Json | null
+          generated_at: string
+          id: string
+          leads_snapshot: Json | null
+          tasks_snapshot: Json | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          content: Json
+          context_snapshot?: Json | null
+          dev_snapshot?: Json | null
+          generated_at?: string
+          id?: string
+          leads_snapshot?: Json | null
+          tasks_snapshot?: Json | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          content?: Json
+          context_snapshot?: Json | null
+          dev_snapshot?: Json | null
+          generated_at?: string
+          id?: string
+          leads_snapshot?: Json | null
+          tasks_snapshot?: Json | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      business_context: {
+        Row: {
+          id: string
+          key: string
+          updated_at: string
+          user_id: string
+          value: string | null
+        }
+        Insert: {
+          id?: string
+          key: string
+          updated_at?: string
+          user_id: string
+          value?: string | null
+        }
+        Update: {
+          id?: string
+          key?: string
+          updated_at?: string
+          user_id?: string
+          value?: string | null
+        }
+        Relationships: []
+      }
+      dev_item_updates: {
+        Row: {
+          created_at: string
+          dev_item_id: string
+          field_changed: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dev_item_id: string
+          field_changed: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dev_item_id?: string
+          field_changed?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dev_item_updates_dev_item_id_fkey"
+            columns: ["dev_item_id"]
+            isOneToOne: false
+            referencedRelation: "dev_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dev_items: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          github_issue_url: string | null
+          id: string
+          is_milestone: boolean
+          notes: string | null
+          resolved_at: string | null
+          severity: string | null
+          status: string
+          target_date: string | null
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          github_issue_url?: string | null
+          id?: string
+          is_milestone?: boolean
+          notes?: string | null
+          resolved_at?: string | null
+          severity?: string | null
+          status?: string
+          target_date?: string | null
+          title: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          github_issue_url?: string | null
+          id?: string
+          is_milestone?: boolean
+          notes?: string | null
+          resolved_at?: string | null
+          severity?: string | null
+          status?: string
+          target_date?: string | null
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      lead_contacts: {
+        Row: {
+          contact_date: string
+          created_at: string
+          id: string
+          lead_id: string
+          method: string
+          summary: string | null
+          user_id: string
+        }
+        Insert: {
+          contact_date?: string
+          created_at?: string
+          id?: string
+          lead_id: string
+          method: string
+          summary?: string | null
+          user_id: string
+        }
+        Update: {
+          contact_date?: string
+          created_at?: string
+          id?: string
+          lead_id?: string
+          method?: string
+          summary?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_contacts_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leads: {
+        Row: {
+          business_name: string | null
+          created_at: string
+          email: string | null
+          id: string
+          lost_reason: string | null
+          monthly_value_nis: number | null
+          name: string
+          next_action: string | null
+          next_action_date: string | null
+          notes: string | null
+          phone: string | null
+          source: string | null
+          stage: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          business_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          lost_reason?: string | null
+          monthly_value_nis?: number | null
+          name: string
+          next_action?: string | null
+          next_action_date?: string | null
+          notes?: string | null
+          phone?: string | null
+          source?: string | null
+          stage?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          business_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          lost_reason?: string | null
+          monthly_value_nis?: number | null
+          name?: string
+          next_action?: string | null
+          next_action_date?: string | null
+          notes?: string | null
+          phone?: string | null
+          source?: string | null
+          stage?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      tasks: {
+        Row: {
+          ai_rank: number | null
+          completed_at: string | null
+          created_at: string
+          domain: string
+          due_date: string | null
+          id: string
+          lead_id: string | null
+          notes: string | null
+          priority: number
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_rank?: number | null
+          completed_at?: string | null
+          created_at?: string
+          domain: string
+          due_date?: string | null
+          id?: string
+          lead_id?: string | null
+          notes?: string | null
+          priority?: number
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_rank?: number | null
+          completed_at?: string | null
+          created_at?: string
+          domain?: string
+          due_date?: string | null
+          id?: string
+          lead_id?: string | null
+          notes?: string | null
+          priority?: number
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telegram_log: {
+        Row: {
+          chat_id: number | null
+          created_at: string
+          direction: string | null
+          id: string
+          message: string | null
+          parsed_command: string | null
+        }
+        Insert: {
+          chat_id?: number | null
+          created_at?: string
+          direction?: string | null
+          id?: string
+          message?: string | null
+          parsed_command?: string | null
+        }
+        Update: {
+          chat_id?: number | null
+          created_at?: string
+          direction?: string | null
+          id?: string
+          message?: string | null
+          parsed_command?: string | null
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      users: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          telegram_chat_id: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id: string
+          telegram_chat_id?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          telegram_chat_id?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "developer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +530,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "developer"],
+    },
   },
 } as const
