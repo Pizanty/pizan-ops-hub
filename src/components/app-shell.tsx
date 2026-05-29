@@ -49,6 +49,7 @@ export function AppShell({ children, requireAdmin = false }: { children: ReactNo
   const { session, role, loading, user, signOut } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { theme, toggle } = useTheme();
 
   if (loading) {
     return (
