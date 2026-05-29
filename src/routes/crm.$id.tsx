@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { CONTACT_METHODS, LEAD_STAGES, LEAD_SOURCES, type ContactMethod, type Lead, type LeadContact, type LeadSource, type LeadStage } from "@/lib/ptops-types";
+import { CONTACT_METHODS, LEAD_STAGES, LEAD_SOURCES, LOST_REASONS, type ContactMethod, type Lead, type LeadContact, type LeadSource, type LeadStage } from "@/lib/ptops-types";
 import { LeadStageBadge, ContactMethodIcon } from "@/lib/ptops-ui";
 import { WonDialog, LostDialog } from "@/lib/ptops-stage-actions";
 
