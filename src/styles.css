@@ -112,9 +112,67 @@
   --shadow-glow: 0 0 0 1px oklch(0.65 0.22 275 / 0.25), 0 8px 32px -8px oklch(0.6 0.25 275 / 0.45);
 }
 
-/* Use dark theme by default everywhere */
-html {
+/* Light theme — bright mode */
+html:not(.dark) {
+  color-scheme: light;
+
+  --background: oklch(0.985 0.005 270);
+  --foreground: oklch(0.18 0.04 278);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.04 278);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.04 278);
+  --primary: oklch(0.55 0.22 275);
+  --primary-foreground: oklch(0.99 0.005 275);
+  --primary-glow: oklch(0.68 0.2 285);
+  --secondary: oklch(0.95 0.015 275);
+  --secondary-foreground: oklch(0.22 0.05 278);
+  --muted: oklch(0.95 0.012 275);
+  --muted-foreground: oklch(0.45 0.03 275);
+  --accent: oklch(0.93 0.04 278);
+  --accent-foreground: oklch(0.22 0.06 278);
+  --destructive: oklch(0.58 0.24 25);
+  --destructive-foreground: oklch(0.99 0.01 25);
+  --border: oklch(0.88 0.02 278 / 0.8);
+  --input: oklch(0.94 0.015 278);
+  --ring: oklch(0.55 0.22 275);
+
+  --sidebar: oklch(0.97 0.01 275);
+  --sidebar-foreground: oklch(0.22 0.04 278);
+  --sidebar-primary: oklch(0.55 0.22 275);
+  --sidebar-primary-foreground: oklch(0.99 0.005 275);
+  --sidebar-accent: oklch(0.92 0.035 278);
+  --sidebar-accent-foreground: oklch(0.22 0.06 278);
+  --sidebar-border: oklch(0.88 0.02 278 / 0.8);
+  --sidebar-ring: oklch(0.55 0.22 275);
+
+  --domain-sales: oklch(0.55 0.18 235);
+  --domain-product: oklch(0.55 0.22 295);
+  --domain-ops: oklch(0.6 0.17 75);
+  --domain-strategy: oklch(0.55 0.16 160);
+
+  --sev-s1: oklch(0.58 0.22 25);
+  --sev-s2: oklch(0.65 0.18 60);
+  --sev-s3: oklch(0.72 0.16 100);
+
+  --success: oklch(0.6 0.17 155);
+  --warning: oklch(0.7 0.16 75);
+
+  --gradient-primary: linear-gradient(135deg, oklch(0.55 0.22 275), oklch(0.68 0.2 295));
+  --gradient-surface: linear-gradient(180deg, oklch(1 0 0), oklch(0.96 0.01 275));
+  --gradient-glow: radial-gradient(60% 80% at 20% 0%, oklch(0.7 0.2 275 / 0.18), transparent 60%);
+  --shadow-elegant: 0 10px 40px -12px oklch(0.55 0.18 275 / 0.25);
+  --shadow-glow: 0 0 0 1px oklch(0.55 0.22 275 / 0.18), 0 8px 32px -8px oklch(0.55 0.22 275 / 0.25);
+}
+
+html.dark {
   color-scheme: dark;
+}
+
+html:not(.dark) body {
+  background-image:
+    radial-gradient(80% 60% at 15% -10%, oklch(0.75 0.15 275 / 0.18), transparent 60%),
+    radial-gradient(60% 50% at 100% 0%, oklch(0.78 0.15 295 / 0.14), transparent 60%);
 }
 
 @layer base {
