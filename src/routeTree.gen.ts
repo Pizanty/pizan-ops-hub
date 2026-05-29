@@ -21,6 +21,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as TasksIdRouteImport } from './routes/tasks.$id'
 import { Route as DevIdRouteImport } from './routes/dev.$id'
 import { Route as CrmIdRouteImport } from './routes/crm.$id'
+import { Route as ApiPublicClaudeAgentRouteImport } from './routes/api/public/claude-agent'
 
 const TasksRoute = TasksRouteImport.update({
   id: '/tasks',
@@ -82,6 +83,11 @@ const CrmIdRoute = CrmIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => CrmRoute,
 } as any)
+const ApiPublicClaudeAgentRoute = ApiPublicClaudeAgentRouteImport.update({
+  id: '/api/public/claude-agent',
+  path: '/api/public/claude-agent',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/crm/$id': typeof CrmIdRoute
   '/dev/$id': typeof DevIdRoute
   '/tasks/$id': typeof TasksIdRoute
+  '/api/public/claude-agent': typeof ApiPublicClaudeAgentRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByTo {
   '/crm/$id': typeof CrmIdRoute
   '/dev/$id': typeof DevIdRoute
   '/tasks/$id': typeof TasksIdRoute
+  '/api/public/claude-agent': typeof ApiPublicClaudeAgentRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -125,6 +133,7 @@ export interface FileRoutesById {
   '/crm/$id': typeof CrmIdRoute
   '/dev/$id': typeof DevIdRoute
   '/tasks/$id': typeof TasksIdRoute
+  '/api/public/claude-agent': typeof ApiPublicClaudeAgentRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -141,6 +150,7 @@ export interface FileRouteTypes {
     | '/crm/$id'
     | '/dev/$id'
     | '/tasks/$id'
+    | '/api/public/claude-agent'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -155,6 +165,7 @@ export interface FileRouteTypes {
     | '/crm/$id'
     | '/dev/$id'
     | '/tasks/$id'
+    | '/api/public/claude-agent'
   id:
     | '__root__'
     | '/'
@@ -169,6 +180,7 @@ export interface FileRouteTypes {
     | '/crm/$id'
     | '/dev/$id'
     | '/tasks/$id'
+    | '/api/public/claude-agent'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -181,6 +193,7 @@ export interface RootRouteChildren {
   ReportsRoute: typeof ReportsRoute
   SettingsRoute: typeof SettingsRoute
   TasksRoute: typeof TasksRouteWithChildren
+  ApiPublicClaudeAgentRoute: typeof ApiPublicClaudeAgentRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -269,6 +282,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CrmIdRouteImport
       parentRoute: typeof CrmRoute
     }
+    '/api/public/claude-agent': {
+      id: '/api/public/claude-agent'
+      path: '/api/public/claude-agent'
+      fullPath: '/api/public/claude-agent'
+      preLoaderRoute: typeof ApiPublicClaudeAgentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -312,7 +332,18 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsRoute: ReportsRoute,
   SettingsRoute: SettingsRoute,
   TasksRoute: TasksRouteWithChildren,
+  ApiPublicClaudeAgentRoute: ApiPublicClaudeAgentRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
