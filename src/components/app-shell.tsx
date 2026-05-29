@@ -12,8 +12,11 @@ import {
   LogOut,
   Loader2,
   Sparkles,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useTheme } from "@/hooks/use-theme";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +49,7 @@ export function AppShell({ children, requireAdmin = false }: { children: ReactNo
   const { session, role, loading, user, signOut } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { theme, toggle } = useTheme();
 
   if (loading) {
     return (
@@ -135,18 +139,30 @@ export function AppShell({ children, requireAdmin = false }: { children: ReactNo
               </div>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start text-muted-foreground hover:text-foreground"
-            onClick={async () => {
-              await signOut();
-              navigate({ to: "/login", replace: true });
-            }}
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Sign out
-          </Button>
+          <div className="flex gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex-1 justify-start text-muted-foreground hover:text-foreground"
+              onClick={async () => {
+                await signOut();
+                navigate({ to: "/login", replace: true });
+              }}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign out
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+              onClick={toggle}
+              aria-label={theme === "dark" ? "Switch to bright mode" : "Switch to dark mode"}
+              title={theme === "dark" ? "Switch to bright mode" : "Switch to dark mode"}
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
       </aside>
       <main className="flex-1 overflow-x-hidden">{children}</main>
