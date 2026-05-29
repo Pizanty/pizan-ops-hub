@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { CONTACT_METHODS, LEAD_STAGES, LEAD_SOURCES, LOST_REASONS, type ContactMethod, type Lead, type LeadContact, type LeadSource, type LeadStage } from "@/lib/ptops-types";
 import { LeadStageBadge, ContactMethodIcon } from "@/lib/ptops-ui";
+import { WonDialog, LostDialog } from "@/lib/ptops-stage-actions";
 
 export const Route = createFileRoute("/crm/$id")({ component: LeadDetail });
 
@@ -41,6 +42,8 @@ function LeadDetail() {
 
   const [form, setForm] = useState<Partial<Lead>>({});
   const [logOpen, setLogOpen] = useState(false);
+  const [wonOpen, setWonOpen] = useState(false);
+  const [lostOpen, setLostOpen] = useState(false);
   useEffect(() => { if (lead) setForm(lead); }, [lead]);
 
   const save = useMutation({
@@ -59,8 +62,12 @@ function LeadDetail() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  function markWon() { save.mutate({ stage: "WON" }); }
-  function markLost(reason: string) { save.mutate({ stage: "LOST", lost_reason: reason }); }
+  function handleStageSelect(v: string) {
+    if (v === "WON") { setWonOpen(true); return; }
+    if (v === "LOST") { setLostOpen(true); return; }
+    setForm({ ...form, stage: v as LeadStage });
+  }
+
 
   return (
     <Sheet open onOpenChange={(o) => !o && nav({ to: "/crm" })}>
@@ -76,7 +83,7 @@ function LeadDetail() {
               <div className="space-y-2"><Label>Phone</Label><Input value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
               <div className="space-y-2"><Label>Email</Label><Input value={form.email ?? ""} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
               <div className="space-y-2"><Label>Stage</Label>
-                <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v as LeadStage })}>
+                <Select value={form.stage} onValueChange={handleStageSelect}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{LEAD_STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                 </Select>
@@ -102,10 +109,13 @@ function LeadDetail() {
             )}
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => save.mutate({})} disabled={save.isPending}>Save</Button>
-              <Button variant="outline" onClick={markWon}>Mark Won</Button>
-              <Button variant="outline" onClick={() => markLost(form.lost_reason ?? "Other")}>Mark Lost</Button>
+              <Button variant="outline" onClick={() => setWonOpen(true)}>Mark Won</Button>
+              <Button variant="outline" onClick={() => setLostOpen(true)}>Mark Lost</Button>
               <LogContactDialog leadId={id} userId={user?.id} open={logOpen} onOpenChange={setLogOpen} />
             </div>
+            <WonDialog open={wonOpen} lead={lead} userId={user?.id} onOpenChange={setWonOpen} />
+            <LostDialog open={lostOpen} lead={lead} onOpenChange={setLostOpen} />
+
 
             <div>
               <div className="mb-2 text-sm font-semibold">Contact history</div>
