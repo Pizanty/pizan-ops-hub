@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS business_context_user_key_uniq ON public.business_context (user_id, key);
