@@ -1,81 +1,105 @@
-# Telegram Integration — Plan
+# Claude Agent API — Plan
 
-## Current state
+External authenticated API that lets Claude (or any external caller with the bearer token) read and write all PTOPS data via a single POST endpoint.
 
-- Schema is ready: `users.telegram_chat_id` (bigint, unique) and `telegram_log` table already exist.
-- Settings → Telegram lets a user save their chat ID.
-- **No Telegram connector linked**, **no webhook route**, **no command handlers** — the bot is non-functional today.
-- Briefing generation (`generateBriefing` server fn) already works via Lovable AI Gateway and is reusable for `/brief` and `/weekly`.
+## Endpoint choice (important deviation from prompt)
 
-## What "working" means (per `09_API_SPEC` + `10_AUTOMATIONS_AND_RULES`)
+The prompt asks for a Supabase Edge Function at
+`https://[ref].supabase.co/functions/v1/claude-agent`. This project runs on TanStack Start; the stack rule is to use TSS public server routes instead of Edge Functions for app-internal HTTP endpoints. I'll implement it as a TanStack public route — same shape, same auth model, same JSON contract, just a different URL:
 
-1. **Connection** — Telegram connector linked to the project so `TELEGRAM_API_KEY` is available server-side.
-2. **Webhook receiver** — public endpoint that Telegram POSTs updates to, with secret-token verification.
-3. **Command handlers** — `/brief`, `/add`, `/tasks`, `/done`, `/leads`, `/dev`, `/weekly`, `/help`, unknown.
-4. **Webhook registered** with Telegram so messages actually arrive.
-5. **UX in Settings** — show webhook status + a "Send test message" button.
+- **New URL**: `https://pto-ops-flow.lovable.app/api/public/claude-agent` (published) / `https://project--0891c374-4fa6-4eea-891c-4baa1043d222-dev.lovable.app/api/public/claude-agent` (preview).
+- Bypasses Lovable's published-site auth (because of the `/api/public/` prefix), exactly like an Edge Function would.
 
-## Steps
+If you specifically need the `supabase.co/functions/v1/...` URL (because Claude is already configured with it), say so and I'll build it as a real Edge Function instead. Everything else in the spec stays identical.
 
-### 1. Link the Telegram connector
-Call `standard_connectors--connect` with `connector_id: telegram`. After linking, `TELEGRAM_API_KEY` + `LOVABLE_API_KEY` become available in server runtime; nothing else is needed for sending.
+## File layout
 
-### 2. Public webhook route
-Create `src/routes/api/public/telegram/webhook.ts`:
-- `POST` handler, no auth middleware (Telegram calls it unauthenticated).
-- Verify `X-Telegram-Bot-Api-Secret-Token` header against `sha256("telegram-webhook:" + TELEGRAM_API_KEY)` (base64url), constant-time compare.
-- Parse `update.message`. Ignore unknown senders silently: look up `users` row where `telegram_chat_id = message.chat.id`; if none, log to `telegram_log` (direction=`IN`, status=`IGNORED`) and return 200.
-- Dispatch on the first whitespace token of `message.text` to a command handler.
-- Send reply via gateway `POST https://connector-gateway.lovable.dev/telegram/sendMessage`.
-- Log both IN and OUT rows to `telegram_log`.
-- Always return 200 (errors become bot messages, per spec).
+- `src/routes/api/public/claude-agent.ts` — POST + OPTIONS handlers, CORS, token auth, action dispatcher.
+- `src/lib/claude-agent/actions.server.ts` — one function per action; takes `(supabaseAdmin, adminUserId, params)` and returns serializable JSON.
+- `src/lib/claude-agent/schemas.ts` — Zod schemas for each action's `params`.
 
-### 3. Command handlers (server-only helper module)
-`src/lib/telegram/commands.server.ts` exporting one function per command, using `supabaseAdmin` scoped by the resolved user_id:
+No changes to existing routes, components, server functions, or styles.
 
-| Command | Behaviour |
-|---|---|
-| `/help` | Static text listing commands. |
-| `/brief` | Get latest `briefings` row (type=DAILY). If older than 8h or none, run the same logic as `generateBriefing` (extracted into a shared `runBriefing(userId, type)` helper). Format `content.summary` + `top_tasks` as plain text. |
-| `/weekly` | Same as `/brief` but type=WEEKLY, no staleness check (always regenerate). |
-| `/add <text>` | INSERT `tasks` with `title=text`, `priority=3`, `status='TODO'`, `domain` auto-detected via keyword map (A9). Reply with task id + detected domain. |
-| `/tasks` | SELECT top 5 by `priority ASC, due_date ASC` WHERE `status != 'DONE'`. Reply as numbered list. |
-| `/done <text>` | ILIKE search open tasks. 1 match → UPDATE status='DONE'. Multiple → numbered list. Zero → "not found". |
-| `/leads` | Counts by stage + overdue list (`next_action_date <= today`, stage NOT IN WON/LOST/ON_HOLD). |
-| `/dev` | S1/S2 unresolved items + milestones. |
-| unknown | "Unknown command. Send /help" |
+## Secret
 
-Domain keyword map lives next to the handler so it's easy to tweak.
+Add `CLAUDE_AGENT_TOKEN` via `add_secret`. `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` already exist.
 
-### 4. Refactor briefing for reuse
-Extract the body of `generateBriefing.handler` into `runBriefing(supabase, userId, type)` in `src/lib/api/briefing.server.ts`. The existing server fn stays as a thin wrapper; the Telegram webhook calls it with `supabaseAdmin` + the resolved admin user_id.
+## Route handler shape
 
-### 5. Register the webhook
-In build mode, run the sandbox curl from the telegram knowledge file:
-- Compute `secret_token = sha256("telegram-webhook:" + TELEGRAM_API_KEY)` (base64url) in Node.
-- POST to `https://connector-gateway.lovable.dev/telegram/setWebhook` with `url = https://project--0891c374-4fa6-4eea-891c-4baa1043d222-dev.lovable.app/api/public/telegram/webhook`, `secret_token`, `allowed_updates: ["message","edited_message"]`.
-- Verify with `getWebhookInfo`.
+```
+POST /api/public/claude-agent
+1. CORS preflight: OPTIONS → 200 with CORS headers, empty body.
+2. Verify Authorization: Bearer <token> against process.env.CLAUDE_AGENT_TOKEN
+   using constant-time compare. Missing/mismatch → 401 { error: "Unauthorized" } + CORS headers.
+3. Parse JSON body { action: string, params: object }. Bad JSON → 400.
+4. Resolve admin user_id from user_roles where role='admin' limit 1 (cached per request).
+5. Dispatch on action → handler. Validate params with Zod inside the handler.
+6. Wrap result as { ok: true, data: <result> }. Logical errors (validation, not found, bad input) → 200 { ok: false, error }. Crashes → 500 { ok: false, error: "Internal error" }.
+7. All responses include the three CORS headers.
+```
 
-(For published, also register the prod URL `https://pto-ops-flow.lovable.app/...` — single bot can only have one webhook, so we use the stable preview URL during dev and switch to prod URL on publish. Decision: register the **published** URL so the live bot points at the published build; preview can be tested via curl.)
+## Actions
 
-→ **Confirm with user**: register webhook against published URL (`pto-ops-flow.lovable.app`) vs preview (`-dev.lovable.app`)? Default: published.
+All 21 actions from the spec, grouped by area. Each handler uses `supabaseAdmin` (RLS bypassed; auth gate is the bearer token).
 
-### 6. Settings UX additions (`src/routes/settings.tsx`)
-Add to the Telegram section:
-- Webhook status pill (calls a new `getTelegramStatus` server fn that hits `getWebhookInfo`) — shows `url`, `pending_update_count`, last error if any.
-- "Send test message" button → server fn that sends "PTOPS is connected ✅" to the saved `telegram_chat_id`.
-- Small "How to find your chat ID" hint linking to a Telegram bot like `@userinfobot`.
+**Dashboard**
+- `get_dashboard` — parallel fetch of tasks (status ≠ ARCHIVED), leads, dev_items (status ∉ RESOLVED/WONT_FIX), business_context, latest DAILY briefing. Computes weekly_completion (using ISO week start = Monday 00:00 local UTC), overdue_leads count, mrr_nis sum.
 
-## Technical notes (for me)
+**Tasks**
+- `list_tasks` (filters: status, domain, priority, limit=50; order priority asc, due_date asc nulls last)
+- `get_task` (id)
+- `create_task` (title, domain, priority=3, status='TODO', due_date?, notes?, lead_id?; user_id = admin)
+- `update_task` (id + partial fields)
+- `delete_task` (id → { deleted: true })
+- `complete_task` (id → status='DONE'; trigger handles completed_at)
 
-- All gateway calls use the standard headers: `Authorization: Bearer ${LOVABLE_API_KEY}`, `X-Connection-Api-Key: ${TELEGRAM_API_KEY}`.
-- Reply formatting uses `parse_mode: "HTML"`, escape user-supplied text.
-- Webhook handler uses `supabaseAdmin` (RLS bypassed) since Telegram has no Supabase session; user identity comes from `telegram_chat_id` lookup.
-- Rate-limit unknown-sender spam by short-circuiting before doing any work.
-- No new tables required (schema already covers it).
+**Leads / CRM**
+- `list_leads` (stage?, source?, overdue_only?, limit=50; order updated_at desc)
+- `get_lead` (id + lead_contacts ordered contact_date desc)
+- `create_lead` (name + optional fields; default stage='PROSPECT')
+- `update_lead` (id + partial fields). **Special**: when stage→'WON' AND monthly_value_nis provided, also INSERT onboarding task (title `Onboard <name> to CaterFlow`, domain=SALES, priority=1, status=TODO, lead_id, notes with ₪ value). Returns `{ lead, task? }`.
+- `log_contact` (lead_id, method, summary, contact_date=today)
+- `get_pipeline_summary` (counts by stage, mrr_nis, total_leads, overdue array)
+
+**Dev Tracker**
+- `list_dev_items` (type?, severity?, status?, open_only?; order created_at desc)
+- `get_dev_item` (id + dev_item_updates ordered created_at desc)
+- `create_dev_item` (type, title, optional rest; created_by = admin)
+- `update_dev_item` (id + partial; if status='RESOLVED' also set resolved_at = now())
+
+**Business Context**
+- `get_business_context` — returns flat `{ key: value }` object for admin user.
+- `update_business_context` (updates: Record<string,string>) — upsert each pair on `(user_id, key)`. Note: current schema lacks a unique constraint on `(user_id, key)`; I'll add a migration creating that unique index so the upsert is atomic. Returns the full updated map.
+
+**Briefings**
+- `get_latest_briefing` (type='DAILY')
+- `list_briefings` (limit=20; fields id, type, generated_at, content)
+- `save_briefing` (type, content, optional snapshots; user_id = admin)
+
+**Unknown action**
+- Returns the exact error message from the spec listing all 21 valid actions.
+
+## Validation & safety
+
+- Every action's params validated with Zod; enum fields restrict domain/stage/source/method/type/severity to the documented values.
+- IDs validated as UUIDs.
+- Dates validated as `YYYY-MM-DD`.
+- All Supabase errors are caught and returned as `{ ok: false, error: <message> }` (no stack traces leaked).
+- The endpoint is rate-limited only by the bearer token — that's by design (matches the prompt). Document this in a header comment.
+
+## Migration
+
+One small migration: `CREATE UNIQUE INDEX IF NOT EXISTS business_context_user_key_uniq ON public.business_context (user_id, key);` so `update_business_context` upsert works.
+
+## Testing after deploy
+
+1. `curl -X POST .../api/public/claude-agent -H 'Authorization: Bearer <token>' -d '{"action":"get_dashboard","params":{}}'` → 200 `{ ok:true, data:{...} }`.
+2. Missing token → 401 `{ error:"Unauthorized" }`.
+3. Wrong action → 200 `{ ok:false, error:"Unknown action: ..." }`.
+4. `create_task` → `get_task` → `complete_task` → `delete_task` round-trip via curl.
 
 ## Out of scope
 
-- Multi-step conversational state (e.g. waiting for a number reply after `/done` multiple-matches). For v1, just list the matches; user re-issues `/done <more specific text>`.
-- Inline buttons / keyboards.
-- Per-user Telegram (each end-user connecting their own bot) — this is a single workspace bot for the admin operator.
+- No UI surface (Settings stays untouched).
+- No changes to existing server fns, briefing logic, or types.
+- No per-end-user auth — this is a single workspace bearer token, intentional.
