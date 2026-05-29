@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
@@ -12,9 +12,19 @@ import {
   LogOut,
   Loader2,
   Sparkles,
+  Menu,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 const ADMIN_NAV = [
@@ -46,6 +56,7 @@ export function AppShell({ children, requireAdmin = false }: { children: ReactNo
   const { session, role, loading, user, signOut } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [navOpen, setNavOpen] = useState(false);
 
   if (loading) {
     return (
@@ -68,87 +79,130 @@ export function AppShell({ children, requireAdmin = false }: { children: ReactNo
   const nav = role === "admin" ? ADMIN_NAV : DEV_NAV;
   const grouped = groupNav(nav as readonly NavItem[]);
   const initials = (user?.email ?? "?").slice(0, 2).toUpperCase();
+  const current = nav.find((item) =>
+    item.to === "/" ? pathname === "/" : pathname.startsWith(item.to),
+  );
 
   return (
-    <div className="flex min-h-screen w-full">
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar/80 text-sidebar-foreground backdrop-blur-xl md:flex">
-        <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-5">
-          <div className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-primary shadow-glow">
-            <Sparkles className="h-4 w-4 text-primary-foreground" />
-          </div>
-          <div className="flex flex-col leading-tight">
+    <div className="flex min-h-screen w-full flex-col">
+      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/70 backdrop-blur-xl">
+        <div className="flex h-16 items-center gap-3 px-6">
+          <Dialog open={navOpen} onOpenChange={setNavOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 border-border/60 bg-card/60 hover:bg-accent/60"
+              >
+                <Menu className="h-4 w-4" />
+                <span className="hidden font-medium sm:inline">Menu</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent
+              className="max-w-xl gap-0 overflow-hidden border-border/60 bg-card/95 p-0 shadow-elegant backdrop-blur-xl"
+              showCloseButton={false}
+            >
+              <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
+                <div className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-primary shadow-glow">
+                  <Sparkles className="h-4 w-4 text-primary-foreground" />
+                </div>
+                <div className="flex flex-col leading-tight">
+                  <span className="font-display text-sm font-semibold tracking-tight">PTOPS</span>
+                  <span className="font-mono text-[10px] text-muted-foreground">PizanTech · v0.1</span>
+                </div>
+              </div>
+              <div className="max-h-[70vh] overflow-y-auto px-4 py-4">
+                {grouped.map(([group, items]) => (
+                  <div key={group} className="mb-4">
+                    <div className="mb-1.5 px-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
+                      {group}
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {items.map((item) => {
+                        const active =
+                          item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+                        return (
+                          <Link
+                            key={item.to}
+                            to={item.to}
+                            onClick={() => setNavOpen(false)}
+                            className={cn(
+                              "group flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-sm transition-all",
+                              active
+                                ? "border-primary/40 bg-accent text-accent-foreground shadow-glow"
+                                : "border-border/50 bg-card/40 text-foreground/80 hover:border-primary/30 hover:bg-accent/60 hover:text-foreground",
+                            )}
+                          >
+                            <item.icon
+                              className={cn(
+                                "h-4 w-4 transition-colors",
+                                active ? "text-primary" : "text-muted-foreground group-hover:text-foreground",
+                              )}
+                            />
+                            <span className="font-medium">{item.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Link to="/" className="flex items-center gap-2.5">
+            <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-primary shadow-glow">
+              <Sparkles className="h-3.5 w-3.5 text-primary-foreground" />
+            </div>
             <span className="font-display text-sm font-semibold tracking-tight">PTOPS</span>
-            <span className="font-mono text-[10px] text-muted-foreground">PizanTech · v0.1</span>
+          </Link>
+
+          {current && (
+            <div className="ml-2 hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
+              <span>/</span>
+              <span className="font-medium text-foreground">{current.label}</span>
+            </div>
+          )}
+
+          <div className="ml-auto flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-2 pl-1.5 pr-2.5">
+                  <div className="grid h-7 w-7 place-items-center rounded-md bg-gradient-primary font-mono text-[10px] font-semibold text-primary-foreground">
+                    {initials}
+                  </div>
+                  <span className="hidden text-xs text-muted-foreground sm:inline">
+                    {role ?? "—"}
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="flex flex-col gap-0.5">
+                  <span className="truncate text-xs">{user?.email}</span>
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                    {role ?? "—"}
+                  </span>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => navigate({ to: "/settings" })}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={async () => {
+                    await signOut();
+                    navigate({ to: "/login", replace: true });
+                  }}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
+      </header>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
-          {grouped.map(([group, items]) => (
-            <div key={group} className="mb-5">
-              <div className="mb-1.5 px-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
-                {group}
-              </div>
-              <div className="space-y-0.5">
-                {items.map((item) => {
-                  const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
-                  return (
-                    <Link
-                      key={item.to}
-                      to={item.to}
-                      className={cn(
-                        "group relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-all",
-                        active
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-elegant"
-                          : "text-sidebar-foreground/75 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-gradient-primary transition-opacity",
-                          active ? "opacity-100" : "opacity-0",
-                        )}
-                      />
-                      <item.icon
-                        className={cn(
-                          "h-4 w-4 transition-colors",
-                          active ? "text-primary" : "text-sidebar-foreground/60 group-hover:text-sidebar-foreground",
-                        )}
-                      />
-                      <span className="font-medium">{item.label}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </nav>
-
-        <div className="border-t border-sidebar-border p-3">
-          <div className="mb-2 flex items-center gap-2.5 rounded-lg bg-sidebar-accent/40 p-2.5">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-gradient-primary font-mono text-xs font-semibold text-primary-foreground">
-              {initials}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-xs font-medium">{user?.email}</div>
-              <div className="mt-0.5 inline-block rounded border border-border/60 px-1.5 py-0 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-                {role ?? "—"}
-              </div>
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start text-muted-foreground hover:text-foreground"
-            onClick={async () => {
-              await signOut();
-              navigate({ to: "/login", replace: true });
-            }}
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Sign out
-          </Button>
-        </div>
-      </aside>
       <main className="flex-1 overflow-x-hidden">{children}</main>
     </div>
   );
