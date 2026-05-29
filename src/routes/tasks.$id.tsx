@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { GlassDialog, GlassDialogContent, GlassDialogHeader, GlassDialogTitle, GlassDialogBody, GlassDialogFooter } from "@/components/ui/glass-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,42 +42,51 @@ function TaskDetail() {
   });
 
   return (
-    <Sheet open onOpenChange={(o) => !o && nav({ to: "/tasks" })}>
-      <SheetContent className="overflow-y-auto">
-        <SheetHeader><SheetTitle>Edit task</SheetTitle></SheetHeader>
-        {isLoading || !task ? <div className="py-6 text-sm text-muted-foreground">Loading…</div> : (
-          <div className="space-y-4 py-6">
-            <div className="space-y-2"><Label>Title</Label><Input value={form.title ?? ""} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2"><Label>Domain</Label>
-                <Select value={form.domain} onValueChange={(v) => setForm({ ...form, domain: v as Domain })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{DOMAINS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-                </Select>
+    <GlassDialog open onOpenChange={(o) => !o && nav({ to: "/tasks" })}>
+      <GlassDialogContent size="xl">
+        <GlassDialogHeader><GlassDialogTitle>Edit task</GlassDialogTitle></GlassDialogHeader>
+        {isLoading || !task ? (
+          <GlassDialogBody><div className="text-sm text-muted-foreground">Loading…</div></GlassDialogBody>
+        ) : (
+          <>
+            <GlassDialogBody>
+              <div className="space-y-4">
+                <div className="space-y-2"><Label>Title</Label><Input value={form.title ?? ""} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2"><Label>Domain</Label>
+                    <Select value={form.domain} onValueChange={(v) => setForm({ ...form, domain: v as Domain })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{DOMAINS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2"><Label>Status</Label>
+                    <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as TaskStatus })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{TASK_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2"><Label>Priority</Label>
+                    <Select value={String(form.priority)} onValueChange={(v) => setForm({ ...form, priority: Number(v) })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{[1, 2, 3, 4, 5].map((p) => <SelectItem key={p} value={String(p)}>P{p}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2"><Label>Due date</Label><Input type="date" value={form.due_date ?? ""} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></div>
+                </div>
+                <div className="space-y-2"><Label>Notes</Label><Textarea rows={5} value={form.notes ?? ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+                <div className="font-mono text-[10px] text-muted-foreground">
+                  Created {new Date(task.created_at).toLocaleString()}<br />
+                  {task.completed_at && <>Completed {new Date(task.completed_at).toLocaleString()}</>}
+                </div>
               </div>
-              <div className="space-y-2"><Label>Status</Label>
-                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as TaskStatus })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{TASK_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2"><Label>Priority</Label>
-                <Select value={String(form.priority)} onValueChange={(v) => setForm({ ...form, priority: Number(v) })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{[1, 2, 3, 4, 5].map((p) => <SelectItem key={p} value={String(p)}>P{p}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2"><Label>Due date</Label><Input type="date" value={form.due_date ?? ""} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></div>
-            </div>
-            <div className="space-y-2"><Label>Notes</Label><Textarea rows={5} value={form.notes ?? ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
-            <Button className="w-full" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Saving…" : "Save"}</Button>
-            <div className="font-mono text-[10px] text-muted-foreground">
-              Created {new Date(task.created_at).toLocaleString()}<br />
-              {task.completed_at && <>Completed {new Date(task.completed_at).toLocaleString()}</>}
-            </div>
-          </div>
+            </GlassDialogBody>
+            <GlassDialogFooter>
+              <Button variant="ghost" onClick={() => nav({ to: "/tasks" })}>Cancel</Button>
+              <Button disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Saving…" : "Save"}</Button>
+            </GlassDialogFooter>
+          </>
         )}
-      </SheetContent>
-    </Sheet>
+      </GlassDialogContent>
+    </GlassDialog>
   );
 }

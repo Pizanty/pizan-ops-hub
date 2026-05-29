@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { GlassDialog, GlassDialogContent, GlassDialogHeader, GlassDialogTitle, GlassDialogBody, GlassDialogFooter } from "@/components/ui/glass-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { DEV_SEVERITIES, DEV_STATUSES, DEV_TYPES, type DevItem, type DevSeverity, type DevStatus, type DevType } from "@/lib/ptops-types";
@@ -116,31 +116,36 @@ function DevSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (b: boo
     onError: (e: Error) => toast.error(e.message),
   });
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="overflow-y-auto">
-        <SheetHeader><SheetTitle>New dev item</SheetTitle></SheetHeader>
-        <div className="space-y-4 py-6">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2"><Label>Type</Label>
-              <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v as DevType, is_milestone: v === "MILESTONE" })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{DEV_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-              </Select>
+    <GlassDialog open={open} onOpenChange={onOpenChange}>
+      <GlassDialogContent>
+        <GlassDialogHeader><GlassDialogTitle>New dev item</GlassDialogTitle></GlassDialogHeader>
+        <GlassDialogBody>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2"><Label>Type</Label>
+                <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v as DevType, is_milestone: v === "MILESTONE" })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{DEV_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2"><Label>Severity</Label>
+                <Select value={form.severity} onValueChange={(v) => setForm({ ...form, severity: v as DevSeverity })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{DEV_SEVERITIES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-2"><Label>Severity</Label>
-              <Select value={form.severity} onValueChange={(v) => setForm({ ...form, severity: v as DevSeverity })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{DEV_SEVERITIES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
+            <div className="space-y-2"><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Description</Label><Textarea rows={4} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Target date</Label><Input type="date" value={form.target_date} onChange={(e) => setForm({ ...form, target_date: e.target.value })} /></div>
+            <div className="space-y-2"><Label>GitHub issue URL</Label><Input value={form.github_issue_url} onChange={(e) => setForm({ ...form, github_issue_url: e.target.value })} /></div>
           </div>
-          <div className="space-y-2"><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
-          <div className="space-y-2"><Label>Description</Label><Textarea rows={4} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
-          <div className="space-y-2"><Label>Target date</Label><Input type="date" value={form.target_date} onChange={(e) => setForm({ ...form, target_date: e.target.value })} /></div>
-          <div className="space-y-2"><Label>GitHub issue URL</Label><Input value={form.github_issue_url} onChange={(e) => setForm({ ...form, github_issue_url: e.target.value })} /></div>
-          <Button className="w-full" disabled={save.isPending} onClick={() => save.mutate()}>Save</Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+        </GlassDialogBody>
+        <GlassDialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Saving…" : "Save"}</Button>
+        </GlassDialogFooter>
+      </GlassDialogContent>
+    </GlassDialog>
   );
 }
