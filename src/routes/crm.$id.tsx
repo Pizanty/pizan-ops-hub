@@ -83,7 +83,7 @@ function LeadDetail() {
               <div className="space-y-2"><Label>Phone</Label><Input value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
               <div className="space-y-2"><Label>Email</Label><Input value={form.email ?? ""} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
               <div className="space-y-2"><Label>Stage</Label>
-                <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v as LeadStage })}>
+                <Select value={form.stage} onValueChange={handleStageSelect}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{LEAD_STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                 </Select>
@@ -109,10 +109,13 @@ function LeadDetail() {
             )}
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => save.mutate({})} disabled={save.isPending}>Save</Button>
-              <Button variant="outline" onClick={markWon}>Mark Won</Button>
-              <Button variant="outline" onClick={() => markLost(form.lost_reason ?? "Other")}>Mark Lost</Button>
+              <Button variant="outline" onClick={() => setWonOpen(true)}>Mark Won</Button>
+              <Button variant="outline" onClick={() => setLostOpen(true)}>Mark Lost</Button>
               <LogContactDialog leadId={id} userId={user?.id} open={logOpen} onOpenChange={setLogOpen} />
             </div>
+            <WonDialog open={wonOpen} lead={lead} userId={user?.id} onOpenChange={setWonOpen} />
+            <LostDialog open={lostOpen} lead={lead} onOpenChange={setLostOpen} />
+
 
             <div>
               <div className="mb-2 text-sm font-semibold">Contact history</div>
