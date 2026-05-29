@@ -12,8 +12,11 @@ import {
   LogOut,
   Loader2,
   Sparkles,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useTheme } from "@/hooks/use-theme";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
