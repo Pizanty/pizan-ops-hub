@@ -42,6 +42,8 @@ function LeadDetail() {
 
   const [form, setForm] = useState<Partial<Lead>>({});
   const [logOpen, setLogOpen] = useState(false);
+  const [wonOpen, setWonOpen] = useState(false);
+  const [lostOpen, setLostOpen] = useState(false);
   useEffect(() => { if (lead) setForm(lead); }, [lead]);
 
   const save = useMutation({
@@ -60,8 +62,12 @@ function LeadDetail() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  function markWon() { save.mutate({ stage: "WON" }); }
-  function markLost(reason: string) { save.mutate({ stage: "LOST", lost_reason: reason }); }
+  function handleStageSelect(v: string) {
+    if (v === "WON") { setWonOpen(true); return; }
+    if (v === "LOST") { setLostOpen(true); return; }
+    setForm({ ...form, stage: v as LeadStage });
+  }
+
 
   return (
     <Sheet open onOpenChange={(o) => !o && nav({ to: "/crm" })}>
