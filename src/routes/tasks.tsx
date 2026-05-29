@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { GlassDialog, GlassDialogContent, GlassDialogHeader, GlassDialogTitle, GlassDialogBody, GlassDialogFooter } from "@/components/ui/glass-dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { DOMAINS, TASK_STATUSES, type Domain, type Task, type TaskStatus } from "@/lib/ptops-types";
 import { DomainBadge, TaskStatusBadge, PriorityDot, EmptyState, isOverdue } from "@/lib/ptops-ui";
@@ -207,31 +207,36 @@ function TaskSheet({ open, onOpenChange, task }: { open: boolean; onOpenChange: 
   });
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent>
-        <SheetHeader><SheetTitle>{task ? "Edit task" : "New task"}</SheetTitle></SheetHeader>
-        <div className="space-y-4 py-6">
-          <div className="space-y-2"><Label>Title</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What needs doing?" /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2"><Label>Domain</Label>
-              <Select value={domain} onValueChange={(v) => setDomain(v as Domain)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{DOMAINS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-              </Select>
+    <GlassDialog open={open} onOpenChange={onOpenChange}>
+      <GlassDialogContent>
+        <GlassDialogHeader><GlassDialogTitle>{task ? "Edit task" : "New task"}</GlassDialogTitle></GlassDialogHeader>
+        <GlassDialogBody>
+          <div className="space-y-4">
+            <div className="space-y-2"><Label>Title</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What needs doing?" /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2"><Label>Domain</Label>
+                <Select value={domain} onValueChange={(v) => setDomain(v as Domain)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{DOMAINS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2"><Label>Priority</Label>
+                <Select value={String(priority)} onValueChange={(v) => setPriority(Number(v))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{[1, 2, 3, 4, 5].map((p) => <SelectItem key={p} value={String(p)}>P{p}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-2"><Label>Priority</Label>
-              <Select value={String(priority)} onValueChange={(v) => setPriority(Number(v))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{[1, 2, 3, 4, 5].map((p) => <SelectItem key={p} value={String(p)}>P{p}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
+            <div className="space-y-2"><Label>Due date</Label><Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></div>
+            <div className="space-y-2"><Label>Notes</Label><Textarea rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
           </div>
-          <div className="space-y-2"><Label>Due date</Label><Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></div>
-          <div className="space-y-2"><Label>Notes</Label><Textarea rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
-          <Button className="w-full" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Saving…" : "Save"}</Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+        </GlassDialogBody>
+        <GlassDialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Saving…" : "Save"}</Button>
+        </GlassDialogFooter>
+      </GlassDialogContent>
+    </GlassDialog>
   );
 }
 

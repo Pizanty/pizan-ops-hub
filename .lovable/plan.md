@@ -1,37 +1,60 @@
-# Plan: 3 Surgical Fixes
+# Replace Side Sheets with Glass Modal Dialogs
 
-DB schema already exists in Lovable Cloud (briefings, tasks, leads, lead_contacts, dev_items, business_context, user_roles, users, telegram_log all present with RLS). Skipping Step 1 — no migration needed.
+Convert every non-navigation `Sheet` in the app to a centered, glass-style `Dialog`. Sidebars stay only for navigation (`app-shell`, shadcn `sidebar.tsx`).
 
-## Fix 1 — Dashboard "Generate Briefing" button
+## Scope (6 sheets, all object management)
 
-File: `src/routes/index.tsx` → `BriefingCard` only.
+| File | Current sheet | Becomes |
+|---|---|---|
+| `src/routes/tasks.tsx` | `TaskSheet` (create) | `TaskDialog` |
+| `src/routes/tasks.$id.tsx` | Edit task sheet | Edit task dialog |
+| `src/routes/crm.tsx` | `LeadSheet` (create) | `LeadDialog` |
+| `src/routes/crm.$id.tsx` | Lead detail sheet | Lead detail dialog |
+| `src/routes/dev.tsx` | `DevSheet` (create) | `DevDialog` |
+| `src/routes/dev.$id.tsx` | Dev item detail sheet | Dev item detail dialog |
 
-- Add imports: `useMutation`, `useQueryClient`, `useServerFn`, `generateBriefing`, `Sparkles`, `Loader2`, `toast` (sonner).
-- Add a `useMutation` wrapping `useServerFn(generateBriefing)`; on success invalidate `["briefing","latest",userId]` + toast "Briefing generated"; on error toast error message.
-- Compute `hasToday = data && new Date(data.generated_at).toDateString() === new Date().toDateString()`.
-- Empty state OR `!hasToday`: render a prominent button "Generate Daily Briefing" (Sparkles icon, Loader2 when pending) calling `mutate({ data: { type: "DAILY" }})`.
-- Header: add a small "Regenerate" ghost button next to History link, same mutation, disabled while pending.
-- Keep all other dashboard cards untouched.
+No changes to: `src/components/app-shell.tsx`, `src/components/ui/sidebar.tsx`, navigation.
 
-## Fix 2 — WON / LOST modals + onboarding task
+## Visual style — "Large glass-style modal"
 
-Shared helper to avoid duplication: create `src/lib/ptops-stage-actions.tsx` exporting two small controlled dialog components:
-- `<WonDialog open lead onOpenChange onDone />` — input "Monthly value (₪)" (number, required). On confirm: update lead `{stage:'WON', monthly_value_nis:value}`, then insert task `{title:"Onboard "+name+" to CaterFlow", domain:"SALES", priority:1, status:"TODO", lead_id, user_id, notes:"New paying customer. Monthly value: ₪"+value+"/mo"}`. Invalidate `leads` + `tasks` queries. Toast "Won! Onboarding task created."
-- `<LostDialog open lead onOpenChange onDone />` — Select reason (Price/Timing/Competitor/No Interest/Other). On confirm: update `{stage:'LOST', lost_reason}`. Invalidate `leads`. Toast.
+A new reusable `GlassDialogContent` wrapper around shadcn `DialogContent`:
 
-Wire-up:
-- `src/routes/crm.tsx` (KanbanBoard): intercept stage changes to WON/LOST — instead of writing immediately, stash pending lead and open the matching dialog. Other stages keep current direct-write path. No DnD behaviour change.
-- `src/routes/crm.$id.tsx`: replace existing `markWon` direct call with WonDialog; align existing LOST flow to use LostDialog so behavior matches.
+- Width: `max-w-2xl` (default) / `max-w-3xl` for detail views (CRM lead, dev item)
+- Max height: `max-h-[85vh]` with internal scroll on body
+- Backdrop: heavier blur + darker overlay (override `DialogOverlay` via className)
+- Surface:
+  - `bg-card/70 backdrop-blur-xl backdrop-saturate-150`
+  - `border border-white/10`
+  - Top hairline: `before:` pseudo with `bg-gradient-primary` (matches sidebar active indicator)
+  - `shadow-elegant` + subtle `shadow-glow` ring
+  - `rounded-xl`
+- Header: title in Sora, optional badge/subtitle row; sticky on scroll
+- Footer: right-aligned actions, divider above (`border-t border-white/10`)
+- Uses existing Midnight Indigo tokens from `src/styles.css` — no new colors
 
-## Fix 3 — Tasks list duplicate bug
+## Implementation steps
 
-File: `src/routes/tasks.tsx`.
+1. **Add `GlassDialogContent` component** at `src/components/ui/glass-dialog.tsx` — thin wrapper exporting `GlassDialog`, `GlassDialogContent`, `GlassDialogHeader`, `GlassDialogTitle`, `GlassDialogFooter`. Re-exports shadcn `Dialog`, `DialogTrigger`, etc. Centralizes the glass styling so every modal is consistent.
 
-- Remove the `rankTasks(data).concat(...)` expression.
-- Fetch all tasks once. Build two memoized groups:
-  - `active` = filter status ∈ {TODO,IN_PROGRESS,BLOCKED}, sorted via existing `rankTasks` logic (already excludes DONE/ARCHIVED — safe).
-  - `completed` = filter status ∈ {DONE,ARCHIVED}, sorted by `completed_at` DESC (nulls last).
-- Drive which group renders from the existing status tab filter. Do not modify `rankTasks` in `ptops-logic.ts`.
+2. **Convert each route** (mechanical swap):
+   - Replace `Sheet/SheetContent/SheetHeader/SheetTitle` imports with the glass equivalents.
+   - Keep all existing form logic, mutations, and validation untouched.
+   - For detail routes (`tasks.$id`, `crm.$id`, `dev.$id`) keep the "close → navigate to list" behavior on `onOpenChange`.
+   - Wrap form body in a scrollable div; move primary/secondary buttons into `GlassDialogFooter`.
+
+3. **Polish per route**:
+   - `crm.$id.tsx`: keep stage badge next to title; the WON/LOST sub-dialogs already exist and continue to work (Dialog over Dialog is fine).
+   - `tasks.tsx`: ensure the new dialog still opens from the "New task" button and from edit affordances.
+   - No layout shift on open (overlay handles scroll lock via shadcn defaults).
 
 ## Out of scope
-Telegram bot, schema changes, restructuring, new screens, RLS edits.
+
+- Navigation sidebar and its collapse behavior
+- Confirm dialogs (already `AlertDialog`)
+- WON/LOST stage dialogs (already dialogs)
+- Any business logic, queries, or server functions
+
+## Verification
+
+- Build passes (typecheck strict).
+- Open each route, trigger create + detail flows, confirm: modal centers, glass effect visible, form submit + close behavior unchanged, ESC + backdrop click close, no horizontal scroll, content scrolls internally when tall.

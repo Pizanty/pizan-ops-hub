@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { GlassDialog, GlassDialogContent, GlassDialogHeader, GlassDialogTitle, GlassDialogBody, GlassDialogFooter } from "@/components/ui/glass-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -70,73 +70,79 @@ function LeadDetail() {
 
 
   return (
-    <Sheet open onOpenChange={(o) => !o && nav({ to: "/crm" })}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">{lead?.name ?? "Lead"} {form.stage && <LeadStageBadge stage={form.stage as LeadStage} />}</SheetTitle>
-        </SheetHeader>
-        {!lead ? <div className="py-6 text-sm text-muted-foreground">Loading…</div> : (
-          <div className="space-y-6 py-6">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2"><Label>Name</Label><Input value={form.name ?? ""} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Business</Label><Input value={form.business_name ?? ""} onChange={(e) => setForm({ ...form, business_name: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Phone</Label><Input value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Email</Label><Input value={form.email ?? ""} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Stage</Label>
-                <Select value={form.stage} onValueChange={handleStageSelect}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{LEAD_STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                </Select>
+    <GlassDialog open onOpenChange={(o) => !o && nav({ to: "/crm" })}>
+      <GlassDialogContent size="xl">
+        <GlassDialogHeader>
+          <GlassDialogTitle className="flex items-center gap-2">{lead?.name ?? "Lead"} {form.stage && <LeadStageBadge stage={form.stage as LeadStage} />}</GlassDialogTitle>
+        </GlassDialogHeader>
+        {!lead ? (
+          <GlassDialogBody><div className="text-sm text-muted-foreground">Loading…</div></GlassDialogBody>
+        ) : (
+          <>
+            <GlassDialogBody>
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2"><Label>Name</Label><Input value={form.name ?? ""} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+                  <div className="space-y-2"><Label>Business</Label><Input value={form.business_name ?? ""} onChange={(e) => setForm({ ...form, business_name: e.target.value })} /></div>
+                  <div className="space-y-2"><Label>Phone</Label><Input value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+                  <div className="space-y-2"><Label>Email</Label><Input value={form.email ?? ""} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+                  <div className="space-y-2"><Label>Stage</Label>
+                    <Select value={form.stage} onValueChange={handleStageSelect}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{LEAD_STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2"><Label>Source</Label>
+                    <Select value={form.source ?? undefined} onValueChange={(v) => setForm({ ...form, source: v as LeadSource })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{LEAD_SOURCES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2"><Label>Monthly value (₪)</Label><Input type="number" value={form.monthly_value_nis ?? ""} onChange={(e) => setForm({ ...form, monthly_value_nis: e.target.value as any })} /></div>
+                  <div className="space-y-2"><Label>Next action date</Label><Input type="date" value={form.next_action_date ?? ""} onChange={(e) => setForm({ ...form, next_action_date: e.target.value })} /></div>
+                </div>
+                <div className="space-y-2"><Label>Next action</Label><Input value={form.next_action ?? ""} onChange={(e) => setForm({ ...form, next_action: e.target.value })} placeholder="e.g. Send proposal" /></div>
+                <div className="space-y-2"><Label>Notes</Label><Textarea rows={4} value={form.notes ?? ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+                {form.stage === "LOST" && (
+                  <div className="space-y-2"><Label>Lost reason</Label>
+                    <Select value={form.lost_reason ?? undefined} onValueChange={(v) => setForm({ ...form, lost_reason: v })}>
+                      <SelectTrigger><SelectValue placeholder="Pick reason" /></SelectTrigger>
+                      <SelectContent>{LOST_REASONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div>
+                  <div className="mb-2 text-sm font-semibold">Contact history</div>
+                  {contacts.length === 0 ? <div className="text-xs text-muted-foreground">No contacts logged.</div> : (
+                    <ul className="space-y-2">
+                      {contacts.map((c) => (
+                        <li key={c.id} className="rounded border border-white/10 bg-card/40 p-2 text-sm">
+                          <div className="flex items-center justify-between">
+                            <ContactMethodIcon method={c.method} />
+                            <span className="font-mono text-[10px] text-muted-foreground">{c.contact_date}</span>
+                          </div>
+                          {c.summary && <p className="mt-1 text-xs text-muted-foreground">{c.summary}</p>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
-              <div className="space-y-2"><Label>Source</Label>
-                <Select value={form.source ?? undefined} onValueChange={(v) => setForm({ ...form, source: v as LeadSource })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{LEAD_SOURCES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                </Select>
+            </GlassDialogBody>
+            <GlassDialogFooter className="flex-wrap sm:justify-between">
+              <div className="flex flex-wrap gap-2">
+                <LogContactDialog leadId={id} userId={user?.id} open={logOpen} onOpenChange={setLogOpen} />
+                <Button variant="outline" onClick={() => setWonOpen(true)}>Mark Won</Button>
+                <Button variant="outline" onClick={() => setLostOpen(true)}>Mark Lost</Button>
               </div>
-              <div className="space-y-2"><Label>Monthly value (₪)</Label><Input type="number" value={form.monthly_value_nis ?? ""} onChange={(e) => setForm({ ...form, monthly_value_nis: e.target.value as any })} /></div>
-              <div className="space-y-2"><Label>Next action date</Label><Input type="date" value={form.next_action_date ?? ""} onChange={(e) => setForm({ ...form, next_action_date: e.target.value })} /></div>
-            </div>
-            <div className="space-y-2"><Label>Next action</Label><Input value={form.next_action ?? ""} onChange={(e) => setForm({ ...form, next_action: e.target.value })} placeholder="e.g. Send proposal" /></div>
-            <div className="space-y-2"><Label>Notes</Label><Textarea rows={4} value={form.notes ?? ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
-            {form.stage === "LOST" && (
-              <div className="space-y-2"><Label>Lost reason</Label>
-                <Select value={form.lost_reason ?? undefined} onValueChange={(v) => setForm({ ...form, lost_reason: v })}>
-                  <SelectTrigger><SelectValue placeholder="Pick reason" /></SelectTrigger>
-                  <SelectContent>{LOST_REASONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className="flex flex-wrap gap-2">
               <Button onClick={() => save.mutate({})} disabled={save.isPending}>Save</Button>
-              <Button variant="outline" onClick={() => setWonOpen(true)}>Mark Won</Button>
-              <Button variant="outline" onClick={() => setLostOpen(true)}>Mark Lost</Button>
-              <LogContactDialog leadId={id} userId={user?.id} open={logOpen} onOpenChange={setLogOpen} />
-            </div>
+            </GlassDialogFooter>
             <WonDialog open={wonOpen} lead={lead} userId={user?.id} onOpenChange={setWonOpen} />
             <LostDialog open={lostOpen} lead={lead} onOpenChange={setLostOpen} />
-
-
-            <div>
-              <div className="mb-2 text-sm font-semibold">Contact history</div>
-              {contacts.length === 0 ? <div className="text-xs text-muted-foreground">No contacts logged.</div> : (
-                <ul className="space-y-2">
-                  {contacts.map((c) => (
-                    <li key={c.id} className="rounded border p-2 text-sm">
-                      <div className="flex items-center justify-between">
-                        <ContactMethodIcon method={c.method} />
-                        <span className="font-mono text-[10px] text-muted-foreground">{c.contact_date}</span>
-                      </div>
-                      {c.summary && <p className="mt-1 text-xs text-muted-foreground">{c.summary}</p>}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
+          </>
         )}
-      </SheetContent>
-    </Sheet>
+      </GlassDialogContent>
+    </GlassDialog>
   );
 }
 

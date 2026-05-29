@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { GlassDialog, GlassDialogContent, GlassDialogHeader, GlassDialogTitle, GlassDialogBody, GlassDialogFooter } from "@/components/ui/glass-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { LEAD_STAGES, LEAD_SOURCES, type Lead, type LeadSource, type LeadStage } from "@/lib/ptops-types";
@@ -119,34 +119,39 @@ function LeadSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (b: bo
   });
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="overflow-y-auto">
-        <SheetHeader><SheetTitle>New lead</SheetTitle></SheetHeader>
-        <div className="space-y-4 py-6">
-          <div className="space-y-2"><Label>Name *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-          <div className="space-y-2"><Label>Business name</Label><Input value={form.business_name} onChange={(e) => setForm({ ...form, business_name: e.target.value })} /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2"><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2"><Label>Source</Label>
-              <Select value={form.source} onValueChange={(v) => setForm({ ...form, source: v as LeadSource })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{LEAD_SOURCES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-              </Select>
+    <GlassDialog open={open} onOpenChange={onOpenChange}>
+      <GlassDialogContent>
+        <GlassDialogHeader><GlassDialogTitle>New lead</GlassDialogTitle></GlassDialogHeader>
+        <GlassDialogBody>
+          <div className="space-y-4">
+            <div className="space-y-2"><Label>Name *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Business name</Label><Input value={form.business_name} onChange={(e) => setForm({ ...form, business_name: e.target.value })} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2"><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+              <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
             </div>
-            <div className="space-y-2"><Label>Stage</Label>
-              <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v as LeadStage })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{LEAD_STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2"><Label>Source</Label>
+                <Select value={form.source} onValueChange={(v) => setForm({ ...form, source: v as LeadSource })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{LEAD_SOURCES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2"><Label>Stage</Label>
+                <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v as LeadStage })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{LEAD_STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
             </div>
+            <div className="space-y-2"><Label>Monthly value (₪)</Label><Input type="number" value={form.monthly_value_nis} onChange={(e) => setForm({ ...form, monthly_value_nis: e.target.value })} /></div>
           </div>
-          <div className="space-y-2"><Label>Monthly value (₪)</Label><Input type="number" value={form.monthly_value_nis} onChange={(e) => setForm({ ...form, monthly_value_nis: e.target.value })} /></div>
-          <Button className="w-full" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Saving…" : "Create"}</Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+        </GlassDialogBody>
+        <GlassDialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Saving…" : "Create"}</Button>
+        </GlassDialogFooter>
+      </GlassDialogContent>
+    </GlassDialog>
   );
 }
