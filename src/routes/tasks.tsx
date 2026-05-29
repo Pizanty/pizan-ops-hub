@@ -35,17 +35,27 @@ function TasksPage() {
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "ALL">("ALL");
   const [domainFilter, setDomainFilter] = useState<Domain | "ALL">("ALL");
 
-  const { data: tasks = [], isLoading } = useQuery({
+  const { data: allTasks = [], isLoading } = useQuery({
     queryKey: ["tasks", "list", user?.id],
     enabled: !!user?.id,
     queryFn: async () => {
       const { data, error } = await supabase.from("tasks").select("*").eq("user_id", user!.id);
       if (error) throw error;
-      return rankTasks(data as Task[]).concat(
-        (data as Task[]).filter((t) => t.status === "DONE" || t.status === "ARCHIVED"),
-      );
+      return data as Task[];
     },
   });
+
+  const tasks = (() => {
+    const active = rankTasks(allTasks);
+    const completed = allTasks
+      .filter((t) => t.status === "DONE" || t.status === "ARCHIVED")
+      .sort((a, b) => {
+        const ta = a.completed_at ? new Date(a.completed_at).getTime() : 0;
+        const tb = b.completed_at ? new Date(b.completed_at).getTime() : 0;
+        return tb - ta;
+      });
+    return [...active, ...completed];
+  })();
 
   const filtered = tasks.filter((t) => {
     if (statusFilter !== "ALL" && t.status !== statusFilter) return false;
