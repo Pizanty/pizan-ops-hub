@@ -100,7 +100,6 @@ export function AppShell({ children, requireAdmin = false }: { children: ReactNo
             </DialogTrigger>
             <DialogContent
               className="max-w-xl gap-0 overflow-hidden border-border/60 bg-card/95 p-0 shadow-elegant backdrop-blur-xl"
-              showCloseButton={false}
             >
               <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
                 <div className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-primary shadow-glow">
