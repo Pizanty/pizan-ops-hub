@@ -95,31 +95,6 @@ export interface DevItemUpdate {
   new_value: string | null;
   created_at: string;
 }
-
-export interface BriefingContent {
-  top_tasks?: Array<{ task_id: string; title: string; rank: number; reasoning: string }>;
-  skip_today?: string;
-  lead_to_contact?: { lead_id: string; name: string; reason: string } | null;
-  risk_flag?: string | null;
-  summary?: string;
-  // weekly extras
-  wins?: string[];
-  losses?: string[];
-  next_week_focus?: string;
-}
-
-export interface Briefing {
-  id: string;
-  user_id: string;
-  type: BriefingType;
-  content: BriefingContent;
-  tasks_snapshot: unknown;
-  leads_snapshot: unknown;
-  dev_snapshot: unknown;
-  context_snapshot: unknown;
-  generated_at: string;
-}
-
 export interface BusinessContextRow {
   id: string;
   user_id: string;
