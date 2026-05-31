@@ -19,7 +19,7 @@ export const Source = z.enum(["REFERRAL", "OUTREACH", "INBOUND", "EVENT", "OTHER
 export const ContactMethod = z.enum(["WHATSAPP", "CALL", "IN_PERSON", "EMAIL", "OTHER"]);
 export const DevType = z.enum(["BUG", "FEATURE", "MILESTONE", "TECH_DEBT"]);
 export const Severity = z.enum(["S1", "S2", "S3"]);
-export const BriefingType = z.enum(["DAILY", "WEEKLY"]);
+
 
 export const Schemas = {
   empty: z.object({}).passthrough().optional().default({}),
