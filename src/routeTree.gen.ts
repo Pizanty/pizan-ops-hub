@@ -16,7 +16,6 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as DevRouteImport } from './routes/dev'
 import { Route as CrmRouteImport } from './routes/crm'
 import { Route as ContextRouteImport } from './routes/context'
-import { Route as BriefingRouteImport } from './routes/briefing'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TasksIdRouteImport } from './routes/tasks.$id'
 import { Route as DevIdRouteImport } from './routes/dev.$id'
@@ -58,11 +57,6 @@ const ContextRoute = ContextRouteImport.update({
   path: '/context',
   getParentRoute: () => rootRouteImport,
 } as any)
-const BriefingRoute = BriefingRouteImport.update({
-  id: '/briefing',
-  path: '/briefing',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -91,7 +85,6 @@ const ApiPublicClaudeAgentRoute = ApiPublicClaudeAgentRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/briefing': typeof BriefingRoute
   '/context': typeof ContextRoute
   '/crm': typeof CrmRouteWithChildren
   '/dev': typeof DevRouteWithChildren
@@ -106,7 +99,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/briefing': typeof BriefingRoute
   '/context': typeof ContextRoute
   '/crm': typeof CrmRouteWithChildren
   '/dev': typeof DevRouteWithChildren
@@ -122,7 +114,6 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/briefing': typeof BriefingRoute
   '/context': typeof ContextRoute
   '/crm': typeof CrmRouteWithChildren
   '/dev': typeof DevRouteWithChildren
@@ -139,7 +130,6 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/briefing'
     | '/context'
     | '/crm'
     | '/dev'
@@ -154,7 +144,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/briefing'
     | '/context'
     | '/crm'
     | '/dev'
@@ -169,7 +158,6 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/briefing'
     | '/context'
     | '/crm'
     | '/dev'
@@ -185,7 +173,6 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  BriefingRoute: typeof BriefingRoute
   ContextRoute: typeof ContextRoute
   CrmRoute: typeof CrmRouteWithChildren
   DevRoute: typeof DevRouteWithChildren
@@ -245,13 +232,6 @@ declare module '@tanstack/react-router' {
       path: '/context'
       fullPath: '/context'
       preLoaderRoute: typeof ContextRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/briefing': {
-      id: '/briefing'
-      path: '/briefing'
-      fullPath: '/briefing'
-      preLoaderRoute: typeof BriefingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -324,7 +304,6 @@ const TasksRouteWithChildren = TasksRoute._addFileChildren(TasksRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  BriefingRoute: BriefingRoute,
   ContextRoute: ContextRoute,
   CrmRoute: CrmRouteWithChildren,
   DevRoute: DevRouteWithChildren,

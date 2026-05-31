@@ -5,7 +5,7 @@ import {
   CheckSquare,
   Users,
   Wrench,
-  FileText,
+  
   BookOpen,
   BarChart3,
   Settings,
@@ -27,7 +27,6 @@ const ADMIN_NAV = [
   { to: "/tasks", label: "Tasks", icon: CheckSquare, group: "Work" },
   { to: "/crm", label: "CRM", icon: Users, group: "Work" },
   { to: "/dev", label: "Dev Tracker", icon: Wrench, group: "Work" },
-  { to: "/briefing", label: "Briefings", icon: FileText, group: "Knowledge" },
   { to: "/context", label: "Context", icon: BookOpen, group: "Knowledge" },
   { to: "/reports", label: "Reports", icon: BarChart3, group: "Knowledge" },
   { to: "/settings", label: "Settings", icon: Settings, group: "System" },

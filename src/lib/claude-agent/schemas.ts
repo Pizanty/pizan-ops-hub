@@ -19,7 +19,7 @@ export const Source = z.enum(["REFERRAL", "OUTREACH", "INBOUND", "EVENT", "OTHER
 export const ContactMethod = z.enum(["WHATSAPP", "CALL", "IN_PERSON", "EMAIL", "OTHER"]);
 export const DevType = z.enum(["BUG", "FEATURE", "MILESTONE", "TECH_DEBT"]);
 export const Severity = z.enum(["S1", "S2", "S3"]);
-export const BriefingType = z.enum(["DAILY", "WEEKLY"]);
+
 
 export const Schemas = {
   empty: z.object({}).passthrough().optional().default({}),
@@ -120,17 +120,6 @@ export const Schemas = {
   update_business_context: z.object({
     updates: z.record(z.string().min(1).max(255), z.string()),
   }),
-
-  get_latest_briefing: z.object({ type: BriefingType.default("DAILY") }),
-  list_briefings: z.object({ limit: z.number().int().min(1).max(200).default(20) }),
-  save_briefing: z.object({
-    type: BriefingType,
-    content: z.record(z.string(), z.any()),
-    tasks_snapshot: z.array(z.any()).optional(),
-    leads_snapshot: z.array(z.any()).optional(),
-    dev_snapshot: z.array(z.any()).optional(),
-    context_snapshot: z.record(z.string(), z.any()).optional(),
-  }),
 };
 
 export const VALID_ACTIONS = [
@@ -153,9 +142,6 @@ export const VALID_ACTIONS = [
   "update_dev_item",
   "get_business_context",
   "update_business_context",
-  "get_latest_briefing",
-  "list_briefings",
-  "save_briefing",
 ] as const;
 
 export type ActionName = (typeof VALID_ACTIONS)[number];

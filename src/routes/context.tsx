@@ -59,7 +59,7 @@ function ContextPage() {
 
   return (
     <>
-      <PageHeader title="Business Context" description="These values are passed to AI briefing prompts." actions={<Button size="sm" onClick={() => save.mutate()} disabled={save.isPending} className="w-full sm:w-auto">Save all</Button>} />
+      <PageHeader title="Business Context" description="Shared business context for the team." actions={<Button size="sm" onClick={() => save.mutate()} disabled={save.isPending} className="w-full sm:w-auto">Save all</Button>} />
       <div className="grid gap-4 p-4 md:grid-cols-2 md:p-6">
         {CONTEXT_KEYS.map((k) => (
           <div key={k} className="space-y-2">

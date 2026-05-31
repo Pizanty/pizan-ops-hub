@@ -26,7 +26,7 @@ export async function get_dashboard(sb: SB, userId: string) {
   const weekStart = startOfWeekUTC();
   const t = today();
 
-  const [tasksR, leadsR, devR, ctxR, briefR, weekDoneR, weekCreatedR] = await Promise.all([
+  const [tasksR, leadsR, devR, ctxR, weekDoneR, weekCreatedR] = await Promise.all([
     sb.from("tasks").select("id,title,domain,priority,status,due_date,notes,ai_rank,lead_id,created_at,completed_at")
       .eq("user_id", userId).neq("status", "ARCHIVED"),
     sb.from("leads").select("id,name,business_name,phone,stage,next_action,next_action_date,monthly_value_nis,source,created_at")
@@ -34,8 +34,6 @@ export async function get_dashboard(sb: SB, userId: string) {
     sb.from("dev_items").select("id,title,type,severity,status,target_date,is_milestone,assigned_to")
       .not("status", "in", "(RESOLVED,WONT_FIX)"),
     sb.from("business_context").select("key,value").eq("user_id", userId),
-    sb.from("briefings").select("id,content,generated_at").eq("user_id", userId).eq("type", "DAILY")
-      .order("generated_at", { ascending: false }).limit(1).maybeSingle(),
     sb.from("tasks").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("completed_at", weekStart),
     sb.from("tasks").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", weekStart),
   ]);
@@ -57,7 +55,6 @@ export async function get_dashboard(sb: SB, userId: string) {
     leads,
     dev_items: devR.data ?? [],
     business_context: ctxR.data ?? [],
-    latest_briefing: briefR.data ?? null,
     weekly_completion: { done: weekDoneR.count ?? 0, created: weekCreatedR.count ?? 0 },
     overdue_leads,
     mrr_nis,
@@ -259,28 +256,5 @@ export async function update_business_context(sb: SB, userId: string, raw: unkno
   return get_business_context(sb, userId);
 }
 
-// ---------- BRIEFINGS ----------
-export async function get_latest_briefing(sb: SB, userId: string, raw: unknown) {
-  const { type } = Schemas.get_latest_briefing.parse(raw ?? {});
-  const { data, error } = await sb.from("briefings").select("*").eq("user_id", userId).eq("type", type)
-    .order("generated_at", { ascending: false }).limit(1).maybeSingle();
-  if (error) throw error;
-  return data;
-}
-
-export async function list_briefings(sb: SB, userId: string, raw: unknown) {
-  const { limit } = Schemas.list_briefings.parse(raw ?? {});
-  const { data, error } = await sb.from("briefings").select("id,type,generated_at,content")
-    .eq("user_id", userId).order("generated_at", { ascending: false }).limit(limit);
-  if (error) throw error;
-  return data ?? [];
-}
-
-export async function save_briefing(sb: SB, userId: string, raw: unknown) {
-  const p = Schemas.save_briefing.parse(raw);
-  const { data, error } = await sb.from("briefings").insert({ ...p, user_id: userId }).select("*").single();
-  if (error) throw error;
-  return data;
-}
 
 export { err };
