@@ -1,6 +1,8 @@
 // Pure logic helpers — used by routes and unit-tested in src/lib/__tests__.
 import type { Lead, Task } from "./ptops-types";
 
+const DOMAIN_WEIGHT: Record<string, number> = { PRODUCT: 0, OPS: 1, SALES: 2, STRATEGY: 3 };
+
 export function rankTasks(tasks: Task[]): Task[] {
   const open = tasks.filter((t) => t.status !== "DONE" && t.status !== "ARCHIVED");
   return [...open].sort((a, b) => {
@@ -8,6 +10,9 @@ export function rankTasks(tasks: Task[]): Task[] {
     const rb = b.ai_rank ?? 999;
     if (ra !== rb) return ra - rb;
     if (a.priority !== b.priority) return a.priority - b.priority;
+    const wa = DOMAIN_WEIGHT[a.domain] ?? 9;
+    const wb = DOMAIN_WEIGHT[b.domain] ?? 9;
+    if (wa !== wb) return wa - wb;
     const da = a.due_date ? new Date(a.due_date).getTime() : Infinity;
     const db = b.due_date ? new Date(b.due_date).getTime() : Infinity;
     return da - db;

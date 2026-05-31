@@ -5,7 +5,7 @@ import { AppShell, PageHeader } from "@/components/app-shell";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { rankTasks, leadStageCounts, pipelineValueNis, overdueFollowups, weekRange } from "@/lib/ptops-logic";
-import { DomainBadge, PriorityDot, SeverityBadge, EmptyState, isOverdue } from "@/lib/ptops-ui";
+import { DomainBadge, PriorityDot, DevPriorityBadge, EmptyState, isOverdue } from "@/lib/ptops-ui";
 import type { Task, Lead, DevItem } from "@/lib/ptops-types";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -119,12 +119,11 @@ function DevStatusCard() {
       return (data ?? []) as DevItem[];
     },
   });
-  const open = (items ?? []).filter((i) => i.status === "OPEN" || i.status === "IN_PROGRESS" || i.status === "BLOCKED");
-  const s1 = open.filter((i) => i.severity === "S1");
-  const s2 = open.filter((i) => i.severity === "S2");
-  const nextMilestone = (items ?? [])
-    .filter((i) => i.is_milestone && i.target_date && i.status !== "RESOLVED" && i.status !== "WONT_FIX")
-    .sort((a, b) => (a.target_date! < b.target_date! ? -1 : 1))[0];
+  const all = items ?? [];
+  const open = all.filter((i) => i.status === "OPEN" || i.status === "IN_PROGRESS" || i.status === "BLOCKED");
+  const openMilestones = open.filter((i) => i.is_milestone);
+  const p1 = open.filter((i) => i.priority === "P1" && !i.is_milestone);
+  const p2 = open.filter((i) => i.priority === "P2" && !i.is_milestone);
   return (
     <div className="rounded-lg border bg-card p-4 md:p-5">
       <div className="mb-3 flex items-center justify-between">
@@ -132,17 +131,27 @@ function DevStatusCard() {
         <Link to="/dev"><Button size="sm" variant="ghost">Open →</Button></Link>
       </div>
       {isLoading ? <Skeleton className="h-24 w-full" /> : (
-        <div className="space-y-2 text-sm">
+        <div className="space-y-3 text-sm">
           <div className="flex items-center gap-3">
-            <div><span className="font-mono text-2xl">{s1.length}</span> <SeverityBadge severity="S1" /></div>
-            <div><span className="font-mono text-2xl">{s2.length}</span> <SeverityBadge severity="S2" /></div>
+            <div><span className="font-mono text-2xl">{p1.length}</span> <DevPriorityBadge priority="P1" /></div>
+            <div><span className="font-mono text-2xl">{p2.length}</span> <DevPriorityBadge priority="P2" /></div>
             <div className="text-xs text-muted-foreground">{open.length} open total</div>
           </div>
-          {nextMilestone && (
-            <div className="rounded border bg-muted/40 p-2 text-xs">
-              <div className="font-mono text-[10px] uppercase text-muted-foreground">Next milestone</div>
-              <div className="font-medium">{nextMilestone.title}</div>
-              <div className="font-mono text-[10px] text-muted-foreground">target {nextMilestone.target_date}</div>
+          {openMilestones.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="font-mono text-[10px] uppercase text-primary">★ Milestones ({openMilestones.length})</div>
+              {openMilestones.slice(0, 3).map((m) => {
+                const blocks = open.filter((i) => (i.blocked_by ?? []).includes(m.id)).length;
+                return (
+                  <Link key={m.id} to="/dev/$id" params={{ id: m.id }} className="block rounded border border-primary/20 bg-primary/5 p-2 hover:border-primary/40">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="truncate text-xs font-medium">{m.title}</div>
+                      {blocks > 0 && <span className="shrink-0 rounded border border-destructive/30 bg-destructive/10 px-1.5 py-0.5 font-mono text-[10px] text-destructive">blocks {blocks}</span>}
+                    </div>
+                    {m.target_date && <div className="font-mono text-[10px] text-muted-foreground">target {m.target_date}</div>}
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>

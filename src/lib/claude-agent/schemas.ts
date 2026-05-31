@@ -19,6 +19,7 @@ export const Source = z.enum(["REFERRAL", "OUTREACH", "INBOUND", "EVENT", "OTHER
 export const ContactMethod = z.enum(["WHATSAPP", "CALL", "IN_PERSON", "EMAIL", "OTHER"]);
 export const DevType = z.enum(["BUG", "FEATURE", "MILESTONE", "TECH_DEBT"]);
 export const Severity = z.enum(["S1", "S2", "S3"]);
+export const Priority = z.enum(["P1", "P2", "P3"]);
 
 
 export const Schemas = {
@@ -93,8 +94,12 @@ export const Schemas = {
   list_dev_items: z.object({
     type: DevType.optional(),
     severity: Severity.optional(),
+    priority: Priority.optional(),
     status: z.string().optional(),
     open_only: z.boolean().optional(),
+    is_milestone: z.boolean().optional(),
+    blocking: uuid.optional(),
+    ready_only: z.boolean().optional(),
   }),
   get_dev_item: z.object({ id: uuid }),
   create_dev_item: z.object({
@@ -102,9 +107,11 @@ export const Schemas = {
     title: z.string().min(1).max(500),
     description: z.string().optional(),
     severity: Severity.optional(),
+    priority: Priority.optional(),
     github_issue_url: z.string().url().optional(),
     target_date: isoDate.optional(),
     is_milestone: z.boolean().default(false),
+    blocked_by: z.array(uuid).optional(),
     notes: z.string().optional(),
   }),
   update_dev_item: z.object({
@@ -112,10 +119,14 @@ export const Schemas = {
     status: z.string().optional(),
     notes: z.string().nullable().optional(),
     severity: Severity.nullable().optional(),
+    priority: Priority.nullable().optional(),
     target_date: isoDate.nullable().optional(),
     title: z.string().min(1).optional(),
     description: z.string().nullable().optional(),
+    is_milestone: z.boolean().optional(),
+    blocked_by: z.array(uuid).optional(),
   }),
+  delete_dev_item: z.object({ id: uuid }),
 
   update_business_context: z.object({
     updates: z.record(z.string().min(1).max(255), z.string()),
@@ -140,6 +151,8 @@ export const VALID_ACTIONS = [
   "get_dev_item",
   "create_dev_item",
   "update_dev_item",
+  "delete_dev_item",
+  "list_unblocked",
   "get_business_context",
   "update_business_context",
 ] as const;
