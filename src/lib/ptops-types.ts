@@ -13,6 +13,7 @@ export type LeadSource = "REFERRAL" | "OUTREACH" | "INBOUND" | "EVENT" | "OTHER"
 export type ContactMethod = "WHATSAPP" | "CALL" | "IN_PERSON" | "EMAIL" | "OTHER";
 export type DevType = "BUG" | "FEATURE" | "MILESTONE" | "TECH_DEBT";
 export type DevSeverity = "S1" | "S2" | "S3";
+export type DevPriority = "P1" | "P2" | "P3";
 export type DevStatus = "OPEN" | "IN_PROGRESS" | "BLOCKED" | "RESOLVED" | "WONT_FIX";
 export type AppRole = "admin" | "developer";
 
@@ -76,10 +77,12 @@ export interface DevItem {
   title: string;
   description: string | null;
   severity: DevSeverity | null;
+  priority: DevPriority | null;
   status: DevStatus;
   github_issue_url: string | null;
   target_date: string | null;
   is_milestone: boolean;
+  blocked_by: string[];
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -119,6 +122,7 @@ export const LEAD_SOURCES: LeadSource[] = ["REFERRAL", "OUTREACH", "INBOUND", "E
 export const CONTACT_METHODS: ContactMethod[] = ["WHATSAPP", "CALL", "IN_PERSON", "EMAIL", "OTHER"];
 export const DEV_TYPES: DevType[] = ["BUG", "FEATURE", "MILESTONE", "TECH_DEBT"];
 export const DEV_SEVERITIES: DevSeverity[] = ["S1", "S2", "S3"];
+export const DEV_PRIORITIES: DevPriority[] = ["P1", "P2", "P3"];
 export const DEV_STATUSES: DevStatus[] = ["OPEN", "IN_PROGRESS", "BLOCKED", "RESOLVED", "WONT_FIX"];
 export const LOST_REASONS = ["Price", "Timing", "Competitor", "No Interest", "Other"] as const;
 

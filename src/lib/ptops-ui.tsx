@@ -4,6 +4,7 @@ import type {
   TaskStatus,
   LeadStage,
   DevSeverity,
+  DevPriority,
   DevStatus,
   DevType,
   ContactMethod,
@@ -73,6 +74,16 @@ export function SeverityBadge({ severity }: { severity: DevSeverity | null }) {
     S3: "bg-[var(--color-sev-s3)]/15 text-[var(--color-sev-s3)] border-[var(--color-sev-s3)]/30",
   };
   return <span className={cn("inline-flex items-center rounded border px-1.5 py-0.5 font-mono text-[10px]", tones[severity])}>{severity}</span>;
+}
+
+export function DevPriorityBadge({ priority }: { priority: DevPriority | null }) {
+  if (!priority) return null;
+  const tones: Record<DevPriority, string> = {
+    P1: "bg-[var(--color-sev-s1)]/15 text-[var(--color-sev-s1)] border-[var(--color-sev-s1)]/30",
+    P2: "bg-[var(--color-sev-s2)]/15 text-[var(--color-sev-s2)] border-[var(--color-sev-s2)]/30",
+    P3: "bg-[var(--color-sev-s3)]/15 text-[var(--color-sev-s3)] border-[var(--color-sev-s3)]/30",
+  };
+  return <span className={cn("inline-flex items-center rounded border px-1.5 py-0.5 font-mono text-[10px]", tones[priority])}>{priority}</span>;
 }
 
 export function DevStatusBadge({ status }: { status: DevStatus }) {

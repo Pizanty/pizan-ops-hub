@@ -53,6 +53,8 @@ async function dispatch(action: string, userId: string, params: unknown) {
     case "get_dev_item": return A.get_dev_item(supabaseAdmin, userId, params);
     case "create_dev_item": return A.create_dev_item(supabaseAdmin, userId, params);
     case "update_dev_item": return A.update_dev_item(supabaseAdmin, userId, params);
+    case "delete_dev_item": return A.delete_dev_item(supabaseAdmin, userId, params);
+    case "list_unblocked": return A.list_unblocked(supabaseAdmin, userId);
     case "get_business_context": return A.get_business_context(supabaseAdmin, userId);
     case "update_business_context": return A.update_business_context(supabaseAdmin, userId, params);
     default:
@@ -66,6 +68,15 @@ export const Route = createFileRoute("/api/public/claude-agent")({
   server: {
     handlers: {
       OPTIONS: async () => new Response(null, { status: 200, headers: CORS }),
+      GET: async () =>
+        json({
+          ok: true,
+          endpoint: "/api/public/claude-agent",
+          methods: ["POST"],
+          canonical_url: "https://ops.pizantech.com/api/public/claude-agent",
+          note: "POST { action, params } with Bearer CLAUDE_AGENT_TOKEN. Always follow 3xx redirects — *.lovable.app may 302 to the custom domain.",
+          valid_actions: VALID_ACTIONS,
+        }),
       POST: async ({ request }) => {
         const expected = process.env.CLAUDE_AGENT_TOKEN;
         if (!expected) {

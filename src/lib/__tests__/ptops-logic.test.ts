@@ -73,6 +73,16 @@ describe("rankTasks", () => {
     ]);
     expect(r[0].id).toBe("b");
   });
+
+  it("breaks ties by domain weight (PRODUCT > OPS > SALES > STRATEGY)", () => {
+    const r = rankTasks([
+      baseTask({ id: "sales", domain: "SALES", priority: 3 }),
+      baseTask({ id: "product", domain: "PRODUCT", priority: 3 }),
+      baseTask({ id: "strategy", domain: "STRATEGY", priority: 3 }),
+      baseTask({ id: "ops", domain: "OPS", priority: 3 }),
+    ]);
+    expect(r.map((t) => t.id)).toEqual(["product", "ops", "sales", "strategy"]);
+  });
 });
 
 describe("leadStageCounts", () => {

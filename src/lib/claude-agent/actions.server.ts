@@ -31,8 +31,7 @@ export async function get_dashboard(sb: SB, userId: string) {
       .eq("user_id", userId).neq("status", "ARCHIVED"),
     sb.from("leads").select("id,name,business_name,phone,stage,next_action,next_action_date,monthly_value_nis,source,created_at")
       .eq("user_id", userId),
-    sb.from("dev_items").select("id,title,type,severity,status,target_date,is_milestone,assigned_to")
-      .not("status", "in", "(RESOLVED,WONT_FIX)"),
+    sb.from("dev_items").select("id,title,type,severity,priority,status,target_date,is_milestone,blocked_by,assigned_to"),
     sb.from("business_context").select("key,value").eq("user_id", userId),
     sb.from("tasks").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("completed_at", weekStart),
     sb.from("tasks").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", weekStart),
@@ -50,10 +49,35 @@ export async function get_dashboard(sb: SB, userId: string) {
   const mrr_nis = leads.filter((l: any) => l.stage === "WON")
     .reduce((s: number, l: any) => s + Number(l.monthly_value_nis ?? 0), 0);
 
+  const allDev = (devR.data ?? []) as any[];
+  const closedStatuses = new Set(["RESOLVED", "WONT_FIX"]);
+  const openDev = allDev.filter((d) => !closedStatuses.has(d.status));
+  const milestones = openDev.filter((d) => d.is_milestone);
+  const dev_items = openDev.filter((d) => !d.is_milestone);
+
+  const blockingIds = new Set<string>();
+  for (const d of openDev) for (const id of (d.blocked_by ?? []) as string[]) blockingIds.add(id);
+  const blocking_milestones = milestones
+    .filter((m) => blockingIds.has(m.id))
+    .map((m) => ({ ...m, blocks_count: openDev.filter((d) => (d.blocked_by ?? []).includes(m.id)).length }));
+
+  const devById = new Map(allDev.map((d) => [d.id, d] as const));
+  const unblocked_now = openDev.filter((d) => {
+    const bb = (d.blocked_by ?? []) as string[];
+    if (bb.length === 0) return false;
+    return bb.every((id) => {
+      const blocker = devById.get(id);
+      return blocker && closedStatuses.has(blocker.status);
+    });
+  });
+
   return {
     tasks: tasksR.data ?? [],
     leads,
-    dev_items: devR.data ?? [],
+    dev_items,
+    milestones,
+    blocking_milestones,
+    unblocked_now,
     business_context: ctxR.data ?? [],
     weekly_completion: { done: weekDoneR.count ?? 0, created: weekCreatedR.count ?? 0 },
     overdue_leads,
@@ -201,12 +225,43 @@ export async function list_dev_items(sb: SB, _userId: string, raw: unknown) {
   let q = sb.from("dev_items").select("*");
   if (p.type) q = q.eq("type", p.type);
   if (p.severity) q = q.eq("severity", p.severity);
+  if (p.priority) q = q.eq("priority", p.priority);
   if (p.status) q = q.eq("status", p.status);
+  if (typeof p.is_milestone === "boolean") q = q.eq("is_milestone", p.is_milestone);
   if (p.open_only) q = q.not("status", "in", "(RESOLVED,WONT_FIX)");
+  if (p.blocking) q = q.contains("blocked_by", [p.blocking]);
   q = q.order("created_at", { ascending: false });
   const { data, error } = await q;
   if (error) throw error;
-  return data ?? [];
+  let rows = (data ?? []) as any[];
+  if (p.ready_only) {
+    const { data: all, error: allErr } = await sb.from("dev_items").select("id,status");
+    if (allErr) throw allErr;
+    const byId = new Map(((all ?? []) as any[]).map((d) => [d.id, d.status]));
+    const closed = new Set(["RESOLVED", "WONT_FIX"]);
+    rows = rows.filter((r) => {
+      const bb = (r.blocked_by ?? []) as string[];
+      return bb.length > 0 && bb.every((id) => closed.has(byId.get(id) ?? ""));
+    });
+  }
+  return rows;
+}
+
+export async function list_unblocked(sb: SB, _userId: string) {
+  const { data, error } = await sb.from("dev_items").select("*");
+  if (error) throw error;
+  const all = (data ?? []) as any[];
+  const closed = new Set(["RESOLVED", "WONT_FIX"]);
+  const byId = new Map(all.map((d) => [d.id, d] as const));
+  return all.filter((d) => {
+    if (closed.has(d.status)) return false;
+    const bb = (d.blocked_by ?? []) as string[];
+    if (bb.length === 0) return false;
+    return bb.every((id) => {
+      const b = byId.get(id);
+      return b && closed.has(b.status);
+    });
+  });
 }
 
 export async function get_dev_item(sb: SB, _userId: string, raw: unknown) {
@@ -235,6 +290,13 @@ export async function update_dev_item(sb: SB, _userId: string, raw: unknown) {
   const { data, error } = await sb.from("dev_items").update(payload).eq("id", id).select("*").single();
   if (error) throw error;
   return data;
+}
+
+export async function delete_dev_item(sb: SB, _userId: string, raw: unknown) {
+  const { id } = Schemas.delete_dev_item.parse(raw);
+  const { error } = await sb.from("dev_items").delete().eq("id", id);
+  if (error) throw error;
+  return { id, deleted: true };
 }
 
 // ---------- BUSINESS CONTEXT ----------
