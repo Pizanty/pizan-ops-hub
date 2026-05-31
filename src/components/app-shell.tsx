@@ -5,7 +5,7 @@ import {
   CheckSquare,
   Users,
   Wrench,
-  FileText,
+  
   BookOpen,
   BarChart3,
   Settings,
