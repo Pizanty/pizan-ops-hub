@@ -14,42 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      briefings: {
-        Row: {
-          content: Json
-          context_snapshot: Json | null
-          dev_snapshot: Json | null
-          generated_at: string
-          id: string
-          leads_snapshot: Json | null
-          tasks_snapshot: Json | null
-          type: string
-          user_id: string
-        }
-        Insert: {
-          content: Json
-          context_snapshot?: Json | null
-          dev_snapshot?: Json | null
-          generated_at?: string
-          id?: string
-          leads_snapshot?: Json | null
-          tasks_snapshot?: Json | null
-          type: string
-          user_id: string
-        }
-        Update: {
-          content?: Json
-          context_snapshot?: Json | null
-          dev_snapshot?: Json | null
-          generated_at?: string
-          id?: string
-          leads_snapshot?: Json | null
-          tasks_snapshot?: Json | null
-          type?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       business_context: {
         Row: {
           id: string
@@ -314,33 +278,6 @@ export type Database = {
           },
         ]
       }
-      telegram_log: {
-        Row: {
-          chat_id: number | null
-          created_at: string
-          direction: string | null
-          id: string
-          message: string | null
-          parsed_command: string | null
-        }
-        Insert: {
-          chat_id?: number | null
-          created_at?: string
-          direction?: string | null
-          id?: string
-          message?: string | null
-          parsed_command?: string | null
-        }
-        Update: {
-          chat_id?: number | null
-          created_at?: string
-          direction?: string | null
-          id?: string
-          message?: string | null
-          parsed_command?: string | null
-        }
-        Relationships: []
-      }
       user_roles: {
         Row: {
           created_at: string
@@ -368,7 +305,6 @@ export type Database = {
           email: string
           full_name: string | null
           id: string
-          telegram_chat_id: number | null
           updated_at: string
         }
         Insert: {
@@ -376,7 +312,6 @@ export type Database = {
           email: string
           full_name?: string | null
           id: string
-          telegram_chat_id?: number | null
           updated_at?: string
         }
         Update: {
@@ -384,7 +319,6 @@ export type Database = {
           email?: string
           full_name?: string | null
           id?: string
-          telegram_chat_id?: number | null
           updated_at?: string
         }
         Relationships: []
