@@ -56,19 +56,19 @@ function BriefingHistory() {
         title="Briefings"
         description="Daily and weekly briefing history."
         actions={
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" disabled={gen.isPending} onClick={() => gen.mutate("DAILY")}>
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+            <Button size="sm" variant="outline" disabled={gen.isPending} onClick={() => gen.mutate("DAILY")} className="flex-1 sm:flex-none">
               {gen.isPending && gen.variables === "DAILY" ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Sparkles className="mr-2 h-3 w-3" />}
               Generate daily
             </Button>
-            <Button size="sm" variant="outline" disabled={gen.isPending} onClick={() => gen.mutate("WEEKLY")}>
+            <Button size="sm" variant="outline" disabled={gen.isPending} onClick={() => gen.mutate("WEEKLY")} className="flex-1 sm:flex-none">
               {gen.isPending && gen.variables === "WEEKLY" ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Sparkles className="mr-2 h-3 w-3" />}
               Generate weekly
             </Button>
           </div>
         }
       />
-      <div className="space-y-2 p-6">
+      <div className="space-y-2 p-4 md:p-6">
         {isLoading ? (
           <div className="text-sm text-muted-foreground">Loading…</div>
         ) : briefings.length === 0 ? (

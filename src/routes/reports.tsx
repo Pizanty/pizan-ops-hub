@@ -68,7 +68,7 @@ function ReportsPage() {
   return (
     <>
       <PageHeader title="Reports" description="Productivity, pipeline, and dev velocity." />
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <Tabs defaultValue="tasks">
           <TabsList>
             <TabsTrigger value="tasks">Tasks</TabsTrigger>

@@ -50,9 +50,9 @@ function DevPage() {
       <PageHeader
         title="Dev Tracker"
         description={isAdmin ? "All bugs, features, milestones." : "Items assigned to you."}
-        actions={isAdmin ? <Button size="sm" onClick={() => setOpen(true)}><Plus className="mr-1 h-4 w-4" />New item</Button> : null}
+        actions={isAdmin ? <Button size="sm" onClick={() => setOpen(true)} className="w-full sm:w-auto"><Plus className="mr-1 h-4 w-4" />New item</Button> : null}
       />
-      <div className="space-y-4 p-6">
+      <div className="space-y-4 p-4 md:p-6">
         {nextMilestone && (
           <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
             <div className="font-mono text-[10px] uppercase text-primary">Next milestone — target {nextMilestone.target_date}</div>
@@ -61,11 +61,11 @@ function DevPage() {
         )}
         {isLoading ? <div className="text-sm text-muted-foreground">Loading…</div> :
           items.length === 0 ? <EmptyState title="No items" hint={isAdmin ? "Create your first dev item." : "Nothing assigned to you yet."} /> :
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:snap-none md:grid-cols-2 md:overflow-visible md:px-0 md:pb-0 xl:grid-cols-5">
             {cols.map((status) => {
               const list = items.filter((i) => i.status === status);
               return (
-                <div key={status} className="rounded-lg border bg-card/40 p-2">
+                <div key={status} className="w-[80vw] shrink-0 snap-start rounded-lg border bg-card/40 p-2 md:w-auto md:shrink">
                   <div className="mb-2 flex items-center justify-between px-1">
                     <span className="font-mono text-[10px] uppercase text-muted-foreground">{status.replace("_", " ")}</span>
                     <span className="font-mono text-[10px] text-muted-foreground">{list.length}</span>
@@ -121,7 +121,7 @@ function DevSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (b: boo
         <GlassDialogHeader><GlassDialogTitle>New dev item</GlassDialogTitle></GlassDialogHeader>
         <GlassDialogBody>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-2"><Label>Type</Label>
                 <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v as DevType, is_milestone: v === "MILESTONE" })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
