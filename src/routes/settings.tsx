@@ -54,7 +54,7 @@ function SettingsPage() {
   return (
     <>
       <PageHeader title="Settings" description="Account, integrations, and team." />
-      <div className="space-y-6 p-6">
+      <div className="space-y-6 p-4 md:p-6">
         <Section title="Account">
           <div className="text-sm"><span className="text-muted-foreground">Email:</span> <span className="font-mono">{user?.email}</span></div>
         </Section>
@@ -80,7 +80,7 @@ function SettingsPage() {
         </Section>
 
         <Section title="Team members">
-          <div className="overflow-hidden rounded-lg border">
+          <div className="overflow-x-auto rounded-lg border">
             <table className="w-full text-sm">
               <thead className="bg-muted/40 text-left font-mono text-[10px] uppercase text-muted-foreground">
                 <tr><th className="px-3 py-2">Email</th><th className="px-3 py-2">Name</th><th className="px-3 py-2">Joined</th></tr>

@@ -23,7 +23,7 @@ function DashboardPage() {
         title="Dashboard"
         description="Today's snapshot — briefing, tasks, leads, dev status."
       />
-      <div className="grid gap-4 p-6 lg:grid-cols-3">
+      <div className="grid gap-4 p-4 md:p-6 lg:grid-cols-3">
         <BriefingCard className="lg:col-span-3" />
         <TopTasksCard />
         <CrmSummaryCard />
@@ -70,9 +70,9 @@ function BriefingCard({ className }: { className?: string }) {
   const hasToday = !!data && new Date(data.generated_at).toDateString() === new Date().toDateString();
 
   return (
-    <div className={"rounded-lg border bg-card p-5 " + (className ?? "")}>
-      <div className="mb-3 flex items-center justify-between">
-        <div>
+    <div className={"rounded-lg border bg-card p-4 md:p-5 " + (className ?? "")}>
+      <div className="mb-3 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <div className="text-sm font-semibold">Today's briefing</div>
           {data && <div className="font-mono text-[10px] text-muted-foreground">{new Date(data.generated_at).toLocaleString()}</div>}
         </div>
@@ -128,7 +128,7 @@ function TopTasksCard() {
     },
   });
   return (
-    <div className="rounded-lg border bg-card p-5">
+    <div className="rounded-lg border bg-card p-4 md:p-5">
       <div className="mb-3 flex items-center justify-between">
         <div className="text-sm font-semibold">Top 3 tasks</div>
         <Link to="/tasks"><Button size="sm" variant="ghost">All →</Button></Link>
@@ -169,7 +169,7 @@ function CrmSummaryCard() {
   const value = useMemo(() => pipelineValueNis(leads ?? []), [leads]);
   const overdue = useMemo(() => overdueFollowups(leads ?? []), [leads]);
   return (
-    <div className="rounded-lg border bg-card p-5">
+    <div className="rounded-lg border bg-card p-4 md:p-5">
       <div className="mb-3 flex items-center justify-between">
         <div className="text-sm font-semibold">CRM</div>
         <Link to="/crm"><Button size="sm" variant="ghost">Open →</Button></Link>
@@ -209,7 +209,7 @@ function DevStatusCard() {
     .filter((i) => i.is_milestone && i.target_date && i.status !== "RESOLVED" && i.status !== "WONT_FIX")
     .sort((a, b) => (a.target_date! < b.target_date! ? -1 : 1))[0];
   return (
-    <div className="rounded-lg border bg-card p-5">
+    <div className="rounded-lg border bg-card p-4 md:p-5">
       <div className="mb-3 flex items-center justify-between">
         <div className="text-sm font-semibold">Dev</div>
         <Link to="/dev"><Button size="sm" variant="ghost">Open →</Button></Link>
@@ -252,9 +252,9 @@ function WeeklyMeterCard({ className }: { className?: string }) {
   });
   const pct = data ? Math.min(100, Math.round((data.done / Math.max(1, data.created)) * 100)) : 0;
   return (
-    <div className={"rounded-lg border bg-card p-5 " + (className ?? "")}>
+    <div className={"rounded-lg border bg-card p-4 md:p-5 " + (className ?? "")}>
       <div className="mb-3 text-sm font-semibold">This week</div>
-      <div className="flex items-end gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
         <div>
           <div className="font-mono text-3xl">{data?.done ?? 0}<span className="text-muted-foreground">/{data?.created ?? 0}</span></div>
           <div className="font-mono text-[10px] uppercase text-muted-foreground">done / created</div>

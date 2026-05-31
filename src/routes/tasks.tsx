@@ -89,19 +89,23 @@ function TasksPage() {
       <PageHeader
         title="Tasks"
         description={`${tasks.filter((t) => t.status !== "DONE" && t.status !== "ARCHIVED").length} open`}
-        actions={<Button size="sm" onClick={() => setOpen(true)}><Plus className="mr-1 h-4 w-4" />New task</Button>}
+        actions={
+          <Button size="sm" onClick={() => setOpen(true)} className="w-full sm:w-auto">
+            <Plus className="mr-1 h-4 w-4" />New task
+          </Button>
+        }
       />
-      <div className="space-y-4 p-6">
+      <div className="space-y-4 p-4 md:p-6">
         <div className="flex flex-wrap gap-2">
           <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as TaskStatus | "ALL")}>
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="min-w-[140px] flex-1 md:w-40 md:flex-none"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">All statuses</SelectItem>
               {TASK_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={domainFilter} onValueChange={(v) => setDomainFilter(v as Domain | "ALL")}>
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="min-w-[140px] flex-1 md:w-40 md:flex-none"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">All domains</SelectItem>
               {DOMAINS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
@@ -112,55 +116,103 @@ function TasksPage() {
         {isLoading ? <div className="text-sm text-muted-foreground">Loading…</div> : filtered.length === 0 ? (
           <EmptyState title="No tasks" hint="Create your first task to get started." action={<Button onClick={() => setOpen(true)}>New task</Button>} />
         ) : (
-          <div className="overflow-hidden rounded-lg border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40 text-left font-mono text-[10px] uppercase text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2">Title</th>
-                  <th className="px-3 py-2">Domain</th>
-                  <th className="px-3 py-2">Pri</th>
-                  <th className="px-3 py-2">Status</th>
-                  <th className="px-3 py-2">Due</th>
-                  <th className="px-3 py-2 w-32"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((t) => (
-                  <tr key={t.id} className="border-t hover:bg-muted/20">
-                    <td className="px-3 py-2">
-                      <Link to="/tasks/$id" params={{ id: t.id }} className="hover:underline">{t.title}</Link>
-                    </td>
-                    <td className="px-3 py-2"><DomainBadge domain={t.domain} /></td>
-                    <td className="px-3 py-2"><PriorityDot priority={t.priority} /></td>
-                    <td className="px-3 py-2"><TaskStatusBadge status={t.status} /></td>
-                    <td className={"px-3 py-2 font-mono text-xs " + (isOverdue(t.due_date) && t.status !== "DONE" ? "text-destructive" : "text-muted-foreground")}>{t.due_date ?? "—"}</td>
-                    <td className="px-3 py-2 text-right">
-                      <div className="flex justify-end gap-1">
-                        {t.status !== "DONE" && (
-                          <Button size="sm" variant="ghost" onClick={() => updateStatus.mutate({ id: t.id, status: "DONE" })}>Done</Button>
-                        )}
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button size="icon" variant="ghost" className="h-7 w-7"><Trash2 className="h-3.5 w-3.5" /></Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete task?</AlertDialogTitle>
-                              <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => deleteTask.mutate(t.id)}>Delete</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </td>
+          <>
+            {/* Mobile card list */}
+            <ul className="space-y-2 md:hidden">
+              {filtered.map((t) => (
+                <li key={t.id} className="rounded-lg border bg-card p-3">
+                  <Link to="/tasks/$id" params={{ id: t.id }} className="block text-sm font-medium leading-snug hover:underline">
+                    {t.title}
+                  </Link>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <DomainBadge domain={t.domain} />
+                    <PriorityDot priority={t.priority} />
+                    <TaskStatusBadge status={t.status} />
+                    {t.due_date && (
+                      <span className={"font-mono text-[10px] " + (isOverdue(t.due_date) && t.status !== "DONE" ? "text-destructive" : "text-muted-foreground")}>
+                        {t.due_date}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-3 flex items-center justify-end gap-1 border-t pt-2">
+                    {t.status !== "DONE" && (
+                      <Button size="sm" variant="ghost" className="min-h-11" onClick={() => updateStatus.mutate({ id: t.id, status: "DONE" })}>
+                        Mark done
+                      </Button>
+                    )}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="icon" variant="ghost" className="h-11 w-11" aria-label="Delete task">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete task?</AlertDialogTitle>
+                          <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => deleteTask.mutate(t.id)}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            {/* Desktop table */}
+            <div className="hidden overflow-x-auto rounded-lg border md:block">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/40 text-left font-mono text-[10px] uppercase text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2">Title</th>
+                    <th className="px-3 py-2">Domain</th>
+                    <th className="px-3 py-2">Pri</th>
+                    <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2">Due</th>
+                    <th className="px-3 py-2 w-32"></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filtered.map((t) => (
+                    <tr key={t.id} className="border-t hover:bg-muted/20">
+                      <td className="px-3 py-2">
+                        <Link to="/tasks/$id" params={{ id: t.id }} className="hover:underline">{t.title}</Link>
+                      </td>
+                      <td className="px-3 py-2"><DomainBadge domain={t.domain} /></td>
+                      <td className="px-3 py-2"><PriorityDot priority={t.priority} /></td>
+                      <td className="px-3 py-2"><TaskStatusBadge status={t.status} /></td>
+                      <td className={"px-3 py-2 font-mono text-xs " + (isOverdue(t.due_date) && t.status !== "DONE" ? "text-destructive" : "text-muted-foreground")}>{t.due_date ?? "—"}</td>
+                      <td className="px-3 py-2 text-right">
+                        <div className="flex justify-end gap-1">
+                          {t.status !== "DONE" && (
+                            <Button size="sm" variant="ghost" onClick={() => updateStatus.mutate({ id: t.id, status: "DONE" })}>Done</Button>
+                          )}
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Delete task"><Trash2 className="h-3.5 w-3.5" /></Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete task?</AlertDialogTitle>
+                                <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteTask.mutate(t.id)}>Delete</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
       <TaskSheet open={open} onOpenChange={setOpen} />
@@ -213,7 +265,7 @@ function TaskSheet({ open, onOpenChange, task }: { open: boolean; onOpenChange: 
         <GlassDialogBody>
           <div className="space-y-4">
             <div className="space-y-2"><Label>Title</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What needs doing?" /></div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-2"><Label>Domain</Label>
                 <Select value={domain} onValueChange={(v) => setDomain(v as Domain)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>

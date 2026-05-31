@@ -45,9 +45,13 @@ function CrmPage() {
       <PageHeader
         title="CRM"
         description={`${leads.length} leads · ₪${pipelineValueNis(leads).toLocaleString()}/mo active pipeline`}
-        actions={<Button size="sm" onClick={() => setOpen(true)}><Plus className="mr-1 h-4 w-4" />New lead</Button>}
+        actions={
+          <Button size="sm" onClick={() => setOpen(true)} className="w-full sm:w-auto">
+            <Plus className="mr-1 h-4 w-4" />New lead
+          </Button>
+        }
       />
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         {isLoading ? <div className="text-sm text-muted-foreground">Loading…</div> :
           leads.length === 0 ? <EmptyState title="No leads yet" action={<Button onClick={() => setOpen(true)}>Add first lead</Button>} /> :
           <KanbanBoard leads={leads} />}
@@ -59,11 +63,11 @@ function CrmPage() {
 
 function KanbanBoard({ leads }: { leads: Lead[] }) {
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
+    <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:snap-none md:grid-cols-2 md:overflow-visible md:px-0 md:pb-0 xl:grid-cols-4 2xl:grid-cols-8">
       {LEAD_STAGES.map((stage) => {
         const items = leads.filter((l) => l.stage === stage);
         return (
-          <div key={stage} className="rounded-lg border bg-card/40 p-2">
+          <div key={stage} className="w-[80vw] shrink-0 snap-start rounded-lg border bg-card/40 p-2 md:w-auto md:shrink">
             <div className="mb-2 flex items-center justify-between px-1">
               <span className="font-mono text-[10px] uppercase text-muted-foreground">{stage.replace(/_/g, " ")}</span>
               <span className="font-mono text-[10px] text-muted-foreground">{items.length}</span>
@@ -126,11 +130,11 @@ function LeadSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (b: bo
           <div className="space-y-4">
             <div className="space-y-2"><Label>Name *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
             <div className="space-y-2"><Label>Business name</Label><Input value={form.business_name} onChange={(e) => setForm({ ...form, business_name: e.target.value })} /></div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-2"><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
               <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-2"><Label>Source</Label>
                 <Select value={form.source} onValueChange={(v) => setForm({ ...form, source: v as LeadSource })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>

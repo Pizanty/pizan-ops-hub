@@ -53,9 +53,9 @@ const GlassDialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2",
+        "fixed left-1/2 top-1/2 z-50 w-[calc(100%-1rem)] -translate-x-1/2 -translate-y-1/2 sm:w-[calc(100%-2rem)]",
         sizeMap[size],
-        "max-h-[85vh] overflow-hidden",
+        "max-h-[90dvh] overflow-hidden",
         "rounded-xl border border-white/10",
         "bg-card/70 backdrop-blur-xl backdrop-saturate-150",
         "shadow-elegant",

@@ -1,105 +1,65 @@
-# Claude Agent API — Plan
+# Mobile UX overhaul
 
-External authenticated API that lets Claude (or any external caller with the bearer token) read and write all PTOPS data via a single POST endpoint.
+The desktop sidebar is hidden below `md` (`hidden md:flex`) with no replacement — there is currently **no way to navigate on mobile**. On top of that, page paddings, tables, filters, and dialogs are sized for desktop.
 
-## Endpoint choice (important deviation from prompt)
+## Scope (frontend / presentation only)
 
-The prompt asks for a Supabase Edge Function at
-`https://[ref].supabase.co/functions/v1/claude-agent`. This project runs on TanStack Start; the stack rule is to use TSS public server routes instead of Edge Functions for app-internal HTTP endpoints. I'll implement it as a TanStack public route — same shape, same auth model, same JSON contract, just a different URL:
+No business logic, no data, no API changes.
 
-- **New URL**: `https://pto-ops-flow.lovable.app/api/public/claude-agent` (published) / `https://project--0891c374-4fa6-4eea-891c-4baa1043d222-dev.lovable.app/api/public/claude-agent` (preview).
-- Bypasses Lovable's published-site auth (because of the `/api/public/` prefix), exactly like an Edge Function would.
+## 1. Mobile navigation shell (`src/components/app-shell.tsx`)
 
-If you specifically need the `supabase.co/functions/v1/...` URL (because Claude is already configured with it), say so and I'll build it as a real Edge Function instead. Everything else in the spec stays identical.
+- Add a **top app bar** visible only on `<md`: brand on the left, hamburger button on the right (and a theme toggle).
+- Hamburger opens an off-canvas **Sheet** (left side) containing the existing grouped nav + user/sign-out block — reuse the same `nav` array so admin/dev role filtering stays identical.
+- Auto-close the sheet on route change (`useRouterState` pathname effect).
+- Keep the existing desktop sidebar untouched (`hidden md:flex`).
+- Add a `pt-14 md:pt-0` to `<main>` so content clears the fixed top bar.
+- Add `safe-area` padding (`pb-[env(safe-area-inset-bottom)]`) on the sheet footer.
 
-## File layout
+## 2. PageHeader + page padding
 
-- `src/routes/api/public/claude-agent.ts` — POST + OPTIONS handlers, CORS, token auth, action dispatcher.
-- `src/lib/claude-agent/actions.server.ts` — one function per action; takes `(supabaseAdmin, adminUserId, params)` and returns serializable JSON.
-- `src/lib/claude-agent/schemas.ts` — Zod schemas for each action's `params`.
+- `PageHeader`: `px-8 py-6` → `px-4 py-4 md:px-8 md:py-6`. Stack title and actions vertically on mobile (`flex-col items-start md:flex-row md:items-end`). Action buttons get `w-full sm:w-auto` where it makes sense.
+- All route content wrappers: `p-6` → `p-4 md:p-6`.
 
-No changes to existing routes, components, server functions, or styles.
+## 3. Tasks page (`src/routes/tasks.tsx`)
 
-## Secret
+- Filters: selects `w-40` → `flex-1 min-w-[140px] md:w-40` so they don't overflow.
+- Replace the desktop table with a **responsive dual view**:
+  - `<md`: card list — each task is a tappable card with title, badges row (domain · P# · status), due date, and a "Done" + delete action row with `min-h-11` tap targets.
+  - `≥md`: keep the existing table inside `overflow-x-auto`.
+- "New task" header button shrinks to icon-only on mobile (`<Plus/>` with `aria-label`).
 
-Add `CLAUDE_AGENT_TOKEN` via `add_secret`. `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` already exist.
+## 4. CRM page (`src/routes/crm.tsx`)
 
-## Route handler shape
+- Kanban is already 1-col on mobile. Tighten card padding and ensure each card has `min-h-14` tap area.
+- Convert the long stage strip into a **horizontal scroll snap** on mobile (`flex overflow-x-auto snap-x` with `w-[80vw] snap-start` columns) so users can swipe through stages instead of an endless vertical stack. Keep the grid layout from `md` up.
 
-```
-POST /api/public/claude-agent
-1. CORS preflight: OPTIONS → 200 with CORS headers, empty body.
-2. Verify Authorization: Bearer <token> against process.env.CLAUDE_AGENT_TOKEN
-   using constant-time compare. Missing/mismatch → 401 { error: "Unauthorized" } + CORS headers.
-3. Parse JSON body { action: string, params: object }. Bad JSON → 400.
-4. Resolve admin user_id from user_roles where role='admin' limit 1 (cached per request).
-5. Dispatch on action → handler. Validate params with Zod inside the handler.
-6. Wrap result as { ok: true, data: <result> }. Logical errors (validation, not found, bad input) → 200 { ok: false, error }. Crashes → 500 { ok: false, error: "Internal error" }.
-7. All responses include the three CORS headers.
-```
+## 5. Dashboard (`src/routes/index.tsx`)
 
-## Actions
+- Grid is already `lg:grid-cols-3`. Verify card internals: 
+  - `BriefingCard` header — stack title/actions on mobile.
+  - `WeeklyMeterCard` `flex items-end` → `flex-col sm:flex-row` so the bar doesn't squeeze.
+  - Reduce inner padding `p-5` → `p-4 md:p-5`.
 
-All 21 actions from the spec, grouped by area. Each handler uses `supabaseAdmin` (RLS bypassed; auth gate is the bearer token).
+## 6. Dev tracker (`src/routes/dev.tsx`), Briefing, Context, Reports, Settings
 
-**Dashboard**
-- `get_dashboard` — parallel fetch of tasks (status ≠ ARCHIVED), leads, dev_items (status ∉ RESOLVED/WONT_FIX), business_context, latest DAILY briefing. Computes weekly_completion (using ISO week start = Monday 00:00 local UTC), overdue_leads count, mrr_nis sum.
+- Apply the same table→card pattern where tables exist (`overflow-x-auto` fallback at minimum).
+- Apply padding / header tweaks consistently.
 
-**Tasks**
-- `list_tasks` (filters: status, domain, priority, limit=50; order priority asc, due_date asc nulls last)
-- `get_task` (id)
-- `create_task` (title, domain, priority=3, status='TODO', due_date?, notes?, lead_id?; user_id = admin)
-- `update_task` (id + partial fields)
-- `delete_task` (id → { deleted: true })
-- `complete_task` (id → status='DONE'; trigger handles completed_at)
+## 7. Dialogs (`GlassDialog`)
 
-**Leads / CRM**
-- `list_leads` (stage?, source?, overdue_only?, limit=50; order updated_at desc)
-- `get_lead` (id + lead_contacts ordered contact_date desc)
-- `create_lead` (name + optional fields; default stage='PROSPECT')
-- `update_lead` (id + partial fields). **Special**: when stage→'WON' AND monthly_value_nis provided, also INSERT onboarding task (title `Onboard <name> to CaterFlow`, domain=SALES, priority=1, status=TODO, lead_id, notes with ₪ value). Returns `{ lead, task? }`.
-- `log_contact` (lead_id, method, summary, contact_date=today)
-- `get_pipeline_summary` (counts by stage, mrr_nis, total_leads, overdue array)
+- Verify content is scrollable on short viewports: `max-h-[85dvh] overflow-y-auto` on the body, full-width on mobile (`w-[calc(100vw-1rem)] sm:max-w-lg`).
+- Form grids `grid-cols-2` → `grid-cols-1 sm:grid-cols-2` so labels/inputs don't get clipped.
 
-**Dev Tracker**
-- `list_dev_items` (type?, severity?, status?, open_only?; order created_at desc)
-- `get_dev_item` (id + dev_item_updates ordered created_at desc)
-- `create_dev_item` (type, title, optional rest; created_by = admin)
-- `update_dev_item` (id + partial; if status='RESOLVED' also set resolved_at = now())
+## 8. Login page
 
-**Business Context**
-- `get_business_context` — returns flat `{ key: value }` object for admin user.
-- `update_business_context` (updates: Record<string,string>) — upsert each pair on `(user_id, key)`. Note: current schema lacks a unique constraint on `(user_id, key)`; I'll add a migration creating that unique index so the upsert is atomic. Returns the full updated map.
-
-**Briefings**
-- `get_latest_briefing` (type='DAILY')
-- `list_briefings` (limit=20; fields id, type, generated_at, content)
-- `save_briefing` (type, content, optional snapshots; user_id = admin)
-
-**Unknown action**
-- Returns the exact error message from the spec listing all 21 valid actions.
-
-## Validation & safety
-
-- Every action's params validated with Zod; enum fields restrict domain/stage/source/method/type/severity to the documented values.
-- IDs validated as UUIDs.
-- Dates validated as `YYYY-MM-DD`.
-- All Supabase errors are caught and returned as `{ ok: false, error: <message> }` (no stack traces leaked).
-- The endpoint is rate-limited only by the bearer token — that's by design (matches the prompt). Document this in a header comment.
-
-## Migration
-
-One small migration: `CREATE UNIQUE INDEX IF NOT EXISTS business_context_user_key_uniq ON public.business_context (user_id, key);` so `update_business_context` upsert works.
-
-## Testing after deploy
-
-1. `curl -X POST .../api/public/claude-agent -H 'Authorization: Bearer <token>' -d '{"action":"get_dashboard","params":{}}'` → 200 `{ ok:true, data:{...} }`.
-2. Missing token → 401 `{ error:"Unauthorized" }`.
-3. Wrong action → 200 `{ ok:false, error:"Unknown action: ..." }`.
-4. `create_task` → `get_task` → `complete_task` → `delete_task` round-trip via curl.
+- Quick pass: center card with `w-[calc(100vw-2rem)] max-w-sm`, padding tuned for mobile.
 
 ## Out of scope
 
-- No UI surface (Settings stays untouched).
-- No changes to existing server fns, briefing logic, or types.
-- No per-end-user auth — this is a single workspace bearer token, intentional.
+- No new routes, no router changes, no schema or server-function changes, no Claude-agent changes.
+- No design-system token edits (colors stay as-is).
+
+## Verification
+
+- Resize to 390×844, 360×800, 414×896: check nav opens/closes, no horizontal scroll, all primary actions reachable with thumb, dialogs scrollable.
+- `≥md`: visual diff should be effectively zero (paddings change at the breakpoint, sidebar unchanged).
