@@ -55,9 +55,6 @@ async function dispatch(action: string, userId: string, params: unknown) {
     case "update_dev_item": return A.update_dev_item(supabaseAdmin, userId, params);
     case "get_business_context": return A.get_business_context(supabaseAdmin, userId);
     case "update_business_context": return A.update_business_context(supabaseAdmin, userId, params);
-    case "get_latest_briefing": return A.get_latest_briefing(supabaseAdmin, userId, params);
-    case "list_briefings": return A.list_briefings(supabaseAdmin, userId, params);
-    case "save_briefing": return A.save_briefing(supabaseAdmin, userId, params);
     default:
       throw new Error(
         `Unknown action: ${action}. Valid actions are: ${VALID_ACTIONS.join(", ")}`,
