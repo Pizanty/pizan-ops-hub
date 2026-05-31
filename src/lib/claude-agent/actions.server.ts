@@ -256,28 +256,5 @@ export async function update_business_context(sb: SB, userId: string, raw: unkno
   return get_business_context(sb, userId);
 }
 
-// ---------- BRIEFINGS ----------
-export async function get_latest_briefing(sb: SB, userId: string, raw: unknown) {
-  const { type } = Schemas.get_latest_briefing.parse(raw ?? {});
-  const { data, error } = await sb.from("briefings").select("*").eq("user_id", userId).eq("type", type)
-    .order("generated_at", { ascending: false }).limit(1).maybeSingle();
-  if (error) throw error;
-  return data;
-}
-
-export async function list_briefings(sb: SB, userId: string, raw: unknown) {
-  const { limit } = Schemas.list_briefings.parse(raw ?? {});
-  const { data, error } = await sb.from("briefings").select("id,type,generated_at,content")
-    .eq("user_id", userId).order("generated_at", { ascending: false }).limit(limit);
-  if (error) throw error;
-  return data ?? [];
-}
-
-export async function save_briefing(sb: SB, userId: string, raw: unknown) {
-  const p = Schemas.save_briefing.parse(raw);
-  const { data, error } = await sb.from("briefings").insert({ ...p, user_id: userId }).select("*").single();
-  if (error) throw error;
-  return data;
-}
 
 export { err };
