@@ -142,9 +142,6 @@ export const VALID_ACTIONS = [
   "update_dev_item",
   "get_business_context",
   "update_business_context",
-  "get_latest_briefing",
-  "list_briefings",
-  "save_briefing",
 ] as const;
 
 export type ActionName = (typeof VALID_ACTIONS)[number];
