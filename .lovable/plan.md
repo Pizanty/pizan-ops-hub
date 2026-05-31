@@ -1,64 +1,71 @@
-# Remove Briefings + Telegram
+## 1. Canonical agent endpoint (no redirect)
 
-Both features go away end-to-end. No edge functions exist for them; the removal is just code, types, and a DB migration.
+Lovable serves the custom domain (`ops.pizantech.com`) as canonical and 302-redirects the `*.lovable.app` host. We can't disable that. Two-part fix:
 
-## Files to delete
+- **Docs:** Update the agent context entry in the app (Context page / `business_context`) and any README to use `https://ops.pizantech.com/api/public/claude-agent` as the documented URL. Add a note: "Always follow 3xx redirects; `*.lovable.app` URLs may redirect to the custom domain."
+- **Endpoint robustness:** Add an explicit `GET` handler on `/api/public/claude-agent` that returns `{ ok:true, endpoint, methods:["POST"], canonical_url }` so agents probing the URL get a useful 200 instead of a redirect-then-empty response. POST stays the only action method.
 
-- `src/routes/briefing.tsx` — the Briefings page (route auto-unregisters from `routeTree.gen.ts` on next build).
-- `src/lib/api/briefing.functions.ts` — the `generateBriefing` server function.
+## 2. `delete_dev_item` action
 
-## Files to edit
+- Add `delete_dev_item` to `Schemas` (`{ id: uuid }`) and `VALID_ACTIONS`.
+- Add handler in `actions.server.ts` that deletes the row (cascades `dev_item_updates`).
+- Wire into `dispatch()` in `src/routes/api/public/claude-agent.ts`.
+- Add a delete button in `src/routes/dev.tsx` (admin only) with confirm dialog.
 
-**`src/components/app-shell.tsx`**
-- Remove the Briefings entry (`{ to: "/briefing", ... }`) from `ADMIN_NAV`.
+## 3. Rename build-priority away from `severity` → add `priority` (P1/P2/P3)
 
-**`src/routes/index.tsx`** (Dashboard)
-- Drop `BriefingCard` import/usage and the import of `generateBriefing` + `Briefing` type.
-- Remove `<BriefingCard />` from the grid. Rework the grid so it doesn't look empty: keep `TopTasksCard`, `CrmSummaryCard`, `DevStatusCard`, `WeeklyMeterCard` — the meter goes full-width at the bottom as today.
-- Update `PageHeader` description to drop the "briefing" word.
+`severity` stays in the schema but is repurposed for live-incident tickets only. Build priority moves to a new field.
 
-**`src/routes/context.tsx`**
-- Page description currently says "passed to AI briefing prompts" — change to "Shared business context for the team."
+Migration:
+- `ALTER TABLE public.dev_items ADD COLUMN priority text` with check constraint `IN ('P1','P2','P3')`.
+- Backfill: `UPDATE dev_items SET priority = REPLACE(severity, 'S', 'P') WHERE severity IS NOT NULL`.
+- Leave `severity` nullable; document it as "operational impact for live incidents only".
 
-**`src/routes/settings.tsx`**
-- Remove the entire **Telegram** `<Section>` (form + `saveTelegram` mutation + `telegramId` state + `useEffect`).
-- Remove the **External services** `<Section>` (it only listed `generate-briefing` and `telegram-webhook` edge fns — neither exists anymore).
-- Drop unused imports (`Input`, `Label`, `useEffect`, `useMutation`, `useQueryClient`, `toast`).
+Code:
+- Add `Priority = z.enum(["P1","P2","P3"])` in `schemas.ts`; add `priority` to `create_dev_item` / `update_dev_item` / `list_dev_items` filter.
+- `src/lib/ptops-types.ts`: add `priority: DevPriority | null` to `DevItem`.
+- `src/routes/dev.tsx`: replace the Severity badge/select on build items with Priority (P1/P2/P3); keep Severity field visible only when `type === 'BUG'` (incident-shaped).
 
-**`src/lib/ptops-types.ts`**
-- Remove `BriefingType`, `BriefingContent`, `Briefing` exports.
-- Remove `telegram_chat_id` from the `UserProfile` interface.
+## 4. Milestone visual grouping + blocking surfacing
 
-**`src/lib/claude-agent/schemas.ts`**
-- Remove `BriefingType` enum.
-- Remove `get_latest_briefing`, `list_briefings`, `save_briefing` from `Schemas`.
-- Remove those three names from the `ACTIONS` array.
+- `get_dashboard` action: split returned `dev_items` into:
+  - `milestones`: open items where `is_milestone = true`
+  - `dev_items`: open non-milestone items
+  - `blocking_milestones`: milestones that appear in any open item's `blocked_by` array (see #5)
+- `src/routes/index.tsx` (`DevStatusCard`): render Milestones as a separate top section with a "Blocking N features" badge; show a divider before regular dev items.
+- `src/routes/dev.tsx`: add a "Milestones" pinned strip above the status columns on desktop, and a Milestones first card-group on mobile.
 
-**`src/lib/claude-agent/actions.server.ts`**
-- Remove the `latest_briefing` field from the dashboard snapshot (and the `briefR` query that feeds it).
-- Remove the three exported briefing action handlers and their entries in the action dispatcher.
+## 5. `blocked_by` dependency field
 
-## Database migration
+Migration:
+- `ALTER TABLE public.dev_items ADD COLUMN blocked_by uuid[] NOT NULL DEFAULT '{}'`.
+- Add GIN index for array containment lookups.
 
-A single migration that drops both feature surfaces:
+Code:
+- Schemas: `blocked_by: z.array(uuid).optional()` on create/update.
+- `list_dev_items`: support `blocking: uuid` filter (`.contains('blocked_by',[id])`) and `ready_only: boolean` filter ("all blockers resolved").
+- New derived action `list_unblocked` (or include `unblocked_now: DevItem[]` in `get_dashboard`): for every open item, return those whose `blocked_by` IDs all have status in `(RESOLVED, WONT_FIX)`.
+- `src/routes/dev.tsx`: in the edit/create sheet, multi-select picker bound to existing dev_items; show "Blocked by:" chips on the item card; show "Unblocks: …" on milestone cards.
 
-```sql
-DROP TABLE IF EXISTS public.briefings CASCADE;
-DROP TABLE IF EXISTS public.telegram_log CASCADE;
-ALTER TABLE public.users DROP COLUMN IF EXISTS telegram_chat_id;
+## 6. Domain-weighted task ranking
+
+Update `rankTasks` in `src/lib/ptops-logic.ts` to apply a domain weight when `ai_rank` is null/tied:
+
+```
+weight(domain) = PRODUCT: 0, OPS: 1, SALES: 2, STRATEGY: 3
+order: ai_rank → priority → domainWeight → due_date
 ```
 
-(The unique index on `telegram_chat_id` is dropped automatically with the column.)
+PRODUCT tasks (build-pipeline blockers for Eidan) float to the top among ties. Update `src/lib/__tests__/ptops-logic.test.ts` with a new case asserting PRODUCT beats SALES at equal priority/due_date. The agent's `list_tasks` SQL ordering stays as-is (DB sort is just `priority, due_date`); UI ranking via `rankTasks` is the surface that matters since the daily-briefing logic is gone.
 
 ## Out of scope
-
-- No edge functions to delete (none currently exist in `supabase/functions/`).
-- No changes to mobile layout, auth, CRM, tasks, dev tracker, or Claude-agent transport — only the briefing/telegram actions are pruned from the agent surface.
-- `LOVABLE_API_KEY` / `TELEGRAM_API_KEY` secrets: not touched by this change (no-op if present).
+- No changes to auth, CRM, or mobile shell.
+- No new tables; severity column is kept (repurposed, not dropped) to avoid breaking historical data.
+- No edge functions; everything stays in the existing TanStack server route + Supabase client.
 
 ## Verification
-
-- Build passes (TS errors would flag missing types or routes).
-- Navigate to `/`, `/tasks`, `/crm`, `/dev`, `/context`, `/reports`, `/settings` — no console errors, sidebar no longer shows "Briefings", Settings no longer shows Telegram or External services sections.
-- Hitting the old `/briefing` URL falls through to the root 404 page.
-- `POST /api/public/claude-agent` with `action: "get_dashboard"` returns 200 without `latest_briefing`; calling the removed actions returns the standard "unknown action" error.
+- `POST /api/public/claude-agent` with `{action:"delete_dev_item", params:{id}}` returns `{ok:true}` and the row is gone.
+- `GET /api/public/claude-agent` returns JSON, not a redirect-to-empty.
+- `get_dashboard` returns `milestones`, `dev_items`, `blocking_milestones`, `unblocked_now` keys.
+- Dev page shows Milestones grouped above other items with a "blocks N" badge.
+- Unit test for `rankTasks` confirms PRODUCT-domain task wins over SALES at equal priority.

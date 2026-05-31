@@ -79,6 +79,7 @@ export type Database = {
       dev_items: {
         Row: {
           assigned_to: string | null
+          blocked_by: string[]
           created_at: string
           created_by: string
           description: string | null
@@ -86,6 +87,7 @@ export type Database = {
           id: string
           is_milestone: boolean
           notes: string | null
+          priority: string | null
           resolved_at: string | null
           severity: string | null
           status: string
@@ -96,6 +98,7 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          blocked_by?: string[]
           created_at?: string
           created_by: string
           description?: string | null
@@ -103,6 +106,7 @@ export type Database = {
           id?: string
           is_milestone?: boolean
           notes?: string | null
+          priority?: string | null
           resolved_at?: string | null
           severity?: string | null
           status?: string
@@ -113,6 +117,7 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          blocked_by?: string[]
           created_at?: string
           created_by?: string
           description?: string | null
@@ -120,6 +125,7 @@ export type Database = {
           id?: string
           is_milestone?: boolean
           notes?: string | null
+          priority?: string | null
           resolved_at?: string | null
           severity?: string | null
           status?: string
