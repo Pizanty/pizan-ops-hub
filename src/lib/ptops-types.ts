@@ -14,14 +14,12 @@ export type ContactMethod = "WHATSAPP" | "CALL" | "IN_PERSON" | "EMAIL" | "OTHER
 export type DevType = "BUG" | "FEATURE" | "MILESTONE" | "TECH_DEBT";
 export type DevSeverity = "S1" | "S2" | "S3";
 export type DevStatus = "OPEN" | "IN_PROGRESS" | "BLOCKED" | "RESOLVED" | "WONT_FIX";
-export type BriefingType = "DAILY" | "WEEKLY";
 export type AppRole = "admin" | "developer";
 
 export interface UserProfile {
   id: string;
   email: string;
   full_name: string | null;
-  telegram_chat_id: number | null;
   created_at: string;
   updated_at: string;
 }
