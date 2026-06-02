@@ -32,7 +32,7 @@ export async function get_dashboard(sb: SB, userId: string) {
     sb.from("leads").select("id,name,business_name,phone,stage,next_action,next_action_date,monthly_value_nis,source,created_at")
       .eq("user_id", userId),
     sb.from("dev_items").select("id,title,type,severity,priority,status,target_date,is_milestone,blocked_by,assigned_to"),
-    sb.from("business_context").select("key,value").eq("user_id", userId),
+    sb.from("business_context").select("key,value,updated_at").eq("user_id", userId),
     sb.from("tasks").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("completed_at", weekStart),
     sb.from("tasks").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", weekStart),
   ]);
