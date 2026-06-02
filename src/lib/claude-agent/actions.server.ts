@@ -199,7 +199,12 @@ export async function get_lead(sb: SB, userId: string, raw: unknown) {
   if (leadR.error) throw leadR.error;
   if (!leadR.data) throw new Error("Lead not found");
   if (contactsR.error) throw contactsR.error;
-  return { ...leadR.data, contacts: contactsR.data ?? [] };
+  const contacts = (contactsR.data ?? []) as any[];
+  const last = contacts[0]?.contact_date ?? null;
+  const days_since_last_contact = last
+    ? Math.floor((Date.now() - new Date(last).getTime()) / 86400000)
+    : null;
+  return { ...leadR.data, contacts, last_contact_at: last, days_since_last_contact };
 }
 
 export async function create_lead(sb: SB, userId: string, raw: unknown) {
