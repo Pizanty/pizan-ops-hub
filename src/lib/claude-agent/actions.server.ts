@@ -172,9 +172,18 @@ export async function complete_task(sb: SB, userId: string, raw: unknown) {
 export async function list_leads(sb: SB, userId: string, raw: unknown) {
   const p = Schemas.list_leads.parse(raw ?? {});
   let q = sb.from("leads").select("*").eq("user_id", userId);
-  if (p.stage) q = q.eq("stage", p.stage);
+  if (p.stage) {
+    if (Array.isArray(p.stage)) q = q.in("stage", p.stage);
+    else q = q.eq("stage", p.stage);
+  }
   if (p.source) q = q.eq("source", p.source);
   if (p.overdue_only) q = q.lt("next_action_date", today()).not("stage", "in", "(WON,LOST,ON_HOLD)");
+  if (p.next_action_before) q = q.lte("next_action_date", p.next_action_before);
+  if (p.next_action_after) q = q.gte("next_action_date", p.next_action_after);
+  if (p.search) {
+    const s = p.search;
+    q = q.or(`name.ilike.%${s}%,business_name.ilike.%${s}%,phone.ilike.%${s}%,email.ilike.%${s}%`);
+  }
   q = q.order("updated_at", { ascending: false }).limit(p.limit);
   const { data, error } = await q;
   if (error) throw error;
