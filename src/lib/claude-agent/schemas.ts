@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CONTEXT_KEYS } from "@/lib/ptops-types";
 
 const uuid = z.string().uuid();
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD");
@@ -21,14 +22,20 @@ export const DevType = z.enum(["BUG", "FEATURE", "MILESTONE", "TECH_DEBT"]);
 export const Severity = z.enum(["S1", "S2", "S3"]);
 export const Priority = z.enum(["P1", "P2", "P3"]);
 
+const stringOrArray = z.union([z.string(), z.array(z.string())]);
+const ContextKeyEnum = z.enum(CONTEXT_KEYS as unknown as [string, ...string[]]);
 
 export const Schemas = {
   empty: z.object({}).passthrough().optional().default({}),
 
   list_tasks: z.object({
-    status: z.string().optional(),
+    status: stringOrArray.optional(),
     domain: Domain.optional(),
     priority: z.number().int().min(1).max(5).optional(),
+    due_before: isoDate.optional(),
+    due_after: isoDate.optional(),
+    has_lead: z.boolean().optional(),
+    search: z.string().min(1).max(200).optional(),
     limit: z.number().int().min(1).max(500).default(50),
   }),
   get_task: z.object({ id: uuid }),
@@ -54,9 +61,12 @@ export const Schemas = {
   complete_task: z.object({ id: uuid }),
 
   list_leads: z.object({
-    stage: Stage.optional(),
+    stage: z.union([Stage, z.array(Stage)]).optional(),
     source: Source.optional(),
     overdue_only: z.boolean().optional(),
+    search: z.string().min(1).max(200).optional(),
+    next_action_before: isoDate.optional(),
+    next_action_after: isoDate.optional(),
     limit: z.number().int().min(1).max(500).default(50),
   }),
   get_lead: z.object({ id: uuid }),
@@ -84,22 +94,32 @@ export const Schemas = {
     lost_reason: z.string().nullable().optional(),
     notes: z.string().nullable().optional(),
   }),
+  delete_lead: z.object({ id: uuid, cascade: z.boolean().default(false) }),
   log_contact: z.object({
     lead_id: uuid,
     method: ContactMethod,
     summary: z.string().min(1),
     contact_date: isoDate.optional(),
   }),
+  list_contacts: z.object({
+    lead_id: uuid.optional(),
+    since: isoDate.optional(),
+    method: ContactMethod.optional(),
+    limit: z.number().int().min(1).max(500).default(50),
+  }),
+  get_lead_contacts: z.object({ lead_id: uuid }),
+  delete_contact: z.object({ id: uuid }),
 
   list_dev_items: z.object({
-    type: DevType.optional(),
+    type: z.union([DevType, z.array(DevType)]).optional(),
     severity: Severity.optional(),
     priority: Priority.optional(),
-    status: z.string().optional(),
+    status: stringOrArray.optional(),
     open_only: z.boolean().optional(),
     is_milestone: z.boolean().optional(),
     blocking: uuid.optional(),
     ready_only: z.boolean().optional(),
+    search: z.string().min(1).max(200).optional(),
   }),
   get_dev_item: z.object({ id: uuid }),
   create_dev_item: z.object({
@@ -131,6 +151,21 @@ export const Schemas = {
   update_business_context: z.object({
     updates: z.record(z.string().min(1).max(255), z.string()),
   }),
+  set_business_context: z.object({ key: ContextKeyEnum, value: z.string() }),
+  append_business_context: z.object({
+    key: ContextKeyEnum,
+    value: z.string().min(1),
+    separator: z.string().default("\n"),
+  }),
+  clear_business_context_key: z.object({ key: ContextKeyEnum }),
+  delete_business_context_key: z.object({ key: ContextKeyEnum }),
+
+  batch: z.object({
+    operations: z
+      .array(z.object({ action: z.string().min(1), params: z.unknown().optional() }))
+      .min(1)
+      .max(25),
+  }),
 };
 
 export const VALID_ACTIONS = [
@@ -145,7 +180,12 @@ export const VALID_ACTIONS = [
   "get_lead",
   "create_lead",
   "update_lead",
+  "delete_lead",
   "log_contact",
+  "list_contacts",
+  "get_lead_contacts",
+  "delete_contact",
+  "lead_data_quality",
   "get_pipeline_summary",
   "list_dev_items",
   "get_dev_item",
@@ -155,6 +195,11 @@ export const VALID_ACTIONS = [
   "list_unblocked",
   "get_business_context",
   "update_business_context",
+  "set_business_context",
+  "append_business_context",
+  "clear_business_context_key",
+  "delete_business_context_key",
+  "batch",
 ] as const;
 
 export type ActionName = (typeof VALID_ACTIONS)[number];
