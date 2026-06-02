@@ -20,10 +20,14 @@ const LABELS: Record<ContextKey, string> = {
   paying_clients: "Paying clients",
   warm_leads: "Warm leads",
   "90_day_target": "90-day target",
+  "90_day_priorities": "90-day priorities",
   success_threshold: "Success threshold",
   operator_hours: "Operator hours / week",
   capital_available: "Capital available",
   current_blockers: "Current blockers",
+  active_warnings: "Active warnings",
+  product_stability: "Product stability",
+  execution_bias_flag: "Execution bias flag",
 };
 
 function ContextPage() {
