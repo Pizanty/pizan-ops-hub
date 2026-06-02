@@ -34,7 +34,7 @@ async function getAdminUserId(): Promise<string> {
   return data.user_id as string;
 }
 
-async function dispatch(action: string, userId: string, params: unknown) {
+async function dispatch(action: string, userId: string, params: unknown): Promise<unknown> {
   switch (action) {
     case "get_dashboard": return A.get_dashboard(supabaseAdmin, userId);
     case "list_tasks": return A.list_tasks(supabaseAdmin, userId, params);
@@ -47,7 +47,12 @@ async function dispatch(action: string, userId: string, params: unknown) {
     case "get_lead": return A.get_lead(supabaseAdmin, userId, params);
     case "create_lead": return A.create_lead(supabaseAdmin, userId, params);
     case "update_lead": return A.update_lead(supabaseAdmin, userId, params);
+    case "delete_lead": return A.delete_lead(supabaseAdmin, userId, params);
     case "log_contact": return A.log_contact(supabaseAdmin, userId, params);
+    case "list_contacts": return A.list_contacts(supabaseAdmin, userId, params);
+    case "get_lead_contacts": return A.get_lead_contacts(supabaseAdmin, userId, params);
+    case "delete_contact": return A.delete_contact(supabaseAdmin, userId, params);
+    case "lead_data_quality": return A.lead_data_quality(supabaseAdmin, userId);
     case "get_pipeline_summary": return A.get_pipeline_summary(supabaseAdmin, userId);
     case "list_dev_items": return A.list_dev_items(supabaseAdmin, userId, params);
     case "get_dev_item": return A.get_dev_item(supabaseAdmin, userId, params);
@@ -57,6 +62,31 @@ async function dispatch(action: string, userId: string, params: unknown) {
     case "list_unblocked": return A.list_unblocked(supabaseAdmin, userId);
     case "get_business_context": return A.get_business_context(supabaseAdmin, userId);
     case "update_business_context": return A.update_business_context(supabaseAdmin, userId, params);
+    case "set_business_context": return A.set_business_context(supabaseAdmin, userId, params);
+    case "append_business_context": return A.append_business_context(supabaseAdmin, userId, params);
+    case "clear_business_context_key": return A.clear_business_context_key(supabaseAdmin, userId, params);
+    case "delete_business_context_key": return A.delete_business_context_key(supabaseAdmin, userId, params);
+    case "batch": {
+      const parsed = (await import("@/lib/claude-agent/schemas")).Schemas.batch.parse(params);
+      const results: Array<{ ok: boolean; action: string; data?: unknown; error?: string }> = [];
+      for (const op of parsed.operations) {
+        if (op.action === "batch") {
+          results.push({ ok: false, action: op.action, error: "Nested batch not allowed" });
+          continue;
+        }
+        if (!(VALID_ACTIONS as readonly string[]).includes(op.action)) {
+          results.push({ ok: false, action: op.action, error: `Unknown action: ${op.action}` });
+          continue;
+        }
+        try {
+          const data = await dispatch(op.action, userId, op.params ?? {});
+          results.push({ ok: true, action: op.action, data });
+        } catch (e) {
+          results.push({ ok: false, action: op.action, error: A.err(e, "Operation failed") });
+        }
+      }
+      return { results };
+    }
     default:
       throw new Error(
         `Unknown action: ${action}. Valid actions are: ${VALID_ACTIONS.join(", ")}`,
