@@ -271,13 +271,20 @@ export async function get_pipeline_summary(sb: SB, userId: string) {
 export async function list_dev_items(sb: SB, _userId: string, raw: unknown) {
   const p = Schemas.list_dev_items.parse(raw ?? {});
   let q = sb.from("dev_items").select("*");
-  if (p.type) q = q.eq("type", p.type);
+  if (p.type) {
+    if (Array.isArray(p.type)) q = q.in("type", p.type);
+    else q = q.eq("type", p.type);
+  }
   if (p.severity) q = q.eq("severity", p.severity);
   if (p.priority) q = q.eq("priority", p.priority);
-  if (p.status) q = q.eq("status", p.status);
+  if (p.status) {
+    if (Array.isArray(p.status)) q = q.in("status", p.status);
+    else q = q.eq("status", p.status);
+  }
   if (typeof p.is_milestone === "boolean") q = q.eq("is_milestone", p.is_milestone);
   if (p.open_only) q = q.not("status", "in", "(RESOLVED,WONT_FIX)");
   if (p.blocking) q = q.contains("blocked_by", [p.blocking]);
+  if (p.search) q = q.or(`title.ilike.%${p.search}%,description.ilike.%${p.search}%`);
   q = q.order("created_at", { ascending: false });
   const { data, error } = await q;
   if (error) throw error;
