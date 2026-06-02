@@ -115,9 +115,17 @@ export async function get_dashboard(sb: SB, userId: string) {
 export async function list_tasks(sb: SB, userId: string, raw: unknown) {
   const p = Schemas.list_tasks.parse(raw ?? {});
   let q = sb.from("tasks").select("*").eq("user_id", userId);
-  if (p.status) q = q.eq("status", p.status);
+  if (p.status) {
+    if (Array.isArray(p.status)) q = q.in("status", p.status);
+    else q = q.eq("status", p.status);
+  }
   if (p.domain) q = q.eq("domain", p.domain);
   if (p.priority != null) q = q.eq("priority", p.priority);
+  if (p.due_before) q = q.lte("due_date", p.due_before);
+  if (p.due_after) q = q.gte("due_date", p.due_after);
+  if (p.has_lead === true) q = q.not("lead_id", "is", null);
+  if (p.has_lead === false) q = q.is("lead_id", null);
+  if (p.search) q = q.or(`title.ilike.%${p.search}%,notes.ilike.%${p.search}%`);
   q = q.order("priority", { ascending: true }).order("due_date", { ascending: true, nullsFirst: false }).limit(p.limit);
   const { data, error } = await q;
   if (error) throw error;
