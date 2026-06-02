@@ -71,14 +71,40 @@ export async function get_dashboard(sb: SB, userId: string) {
     });
   });
 
+  const tasks = (tasksR.data ?? []) as any[];
+  const leadsById = new Map(leads.map((l: any) => [l.id, l] as const));
+  const tasksEnriched = tasks.map((t) => {
+    if (!t.lead_id) return t;
+    const l = leadsById.get(t.lead_id);
+    return l ? { ...t, lead: { id: l.id, name: l.name, stage: l.stage } } : t;
+  });
+  const openStatuses = new Set(["TODO", "IN_PROGRESS", "BLOCKED"]);
+  const tasksByLeadMap = new Map<string, any>();
+  for (const t of tasksEnriched) {
+    if (!t.lead_id || !openStatuses.has(t.status)) continue;
+    const l = leadsById.get(t.lead_id);
+    if (!l) continue;
+    let entry = tasksByLeadMap.get(t.lead_id);
+    if (!entry) {
+      entry = { lead_id: l.id, lead_name: l.name, stage: l.stage, open_tasks: [] };
+      tasksByLeadMap.set(t.lead_id, entry);
+    }
+    entry.open_tasks.push({ id: t.id, title: t.title, priority: t.priority, status: t.status, due_date: t.due_date });
+  }
+
+  const ctxList = (ctxR.data ?? []) as any[];
+  const ctxKv: Record<string, string | null> = {};
+  for (const r of ctxList) ctxKv[r.key] = r.value;
+
   return {
-    tasks: tasksR.data ?? [],
+    tasks: tasksEnriched,
     leads,
+    tasks_by_lead: Array.from(tasksByLeadMap.values()),
     dev_items,
     milestones,
     blocking_milestones,
     unblocked_now,
-    business_context: ctxR.data ?? [],
+    business_context: { kv: ctxKv, list: ctxList },
     weekly_completion: { done: weekDoneR.count ?? 0, created: weekCreatedR.count ?? 0 },
     overdue_leads,
     mrr_nis,
