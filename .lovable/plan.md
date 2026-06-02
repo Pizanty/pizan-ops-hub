@@ -1,71 +1,75 @@
-## 1. Canonical agent endpoint (no redirect)
 
-Lovable serves the custom domain (`ops.pizantech.com`) as canonical and 302-redirects the `*.lovable.app` host. We can't disable that. Two-part fix:
+# Claude Agent API — Round 2
 
-- **Docs:** Update the agent context entry in the app (Context page / `business_context`) and any README to use `https://ops.pizantech.com/api/public/claude-agent` as the documented URL. Add a note: "Always follow 3xx redirects; `*.lovable.app` URLs may redirect to the custom domain."
-- **Endpoint robustness:** Add an explicit `GET` handler on `/api/public/claude-agent` that returns `{ ok:true, endpoint, methods:["POST"], canonical_url }` so agents probing the URL get a useful 200 instead of a redirect-then-empty response. POST stays the only action method.
+Targeted improvements to make the Claude API usable as a real assistant interface, plus full delete + context-write coverage. All changes scoped to `src/lib/claude-agent/*` and `src/routes/api/public/claude-agent.ts` — no UI changes, no auth, no new tables (one seed pass only).
 
-## 2. `delete_dev_item` action
+## 1. `get_business_context` returns empty → seed defaults + expanded keys
 
-- Add `delete_dev_item` to `Schemas` (`{ id: uuid }`) and `VALID_ACTIONS`.
-- Add handler in `actions.server.ts` that deletes the row (cascades `dev_item_updates`).
-- Wire into `dispatch()` in `src/routes/api/public/claude-agent.ts`.
-- Add a delete button in `src/routes/dev.tsx` (admin only) with confirm dialog.
+- Extend `CONTEXT_KEYS` in `src/lib/ptops-types.ts` with high-signal fields: `90_day_priorities`, `active_warnings`, `product_stability`, `execution_bias_flag` (plus existing keys).
+- Seed admin user's `business_context` with placeholder values via `supabase--insert` so the endpoint returns populated data immediately.
+- Update `get_business_context` to return `{ kv: {...}, list: [{key,value,updated_at}] }` — map for convenience, list for timestamps.
+- `src/routes/context.tsx` picks up new keys automatically; add their labels to `LABELS`.
 
-## 3. Rename build-priority away from `severity` → add `priority` (P1/P2/P3)
+## 2. Contact log retrieval
 
-`severity` stays in the schema but is repurposed for live-incident tickets only. Build priority moves to a new field.
+Add to schemas, `VALID_ACTIONS`, `actions.server.ts`, and `dispatch()`:
+- `list_contacts({ lead_id?, since?, method?, limit=50 })` — across all leads, newest first, joined with lead name.
+- `get_lead_contacts({ lead_id })` — full history + `days_since_last_contact`.
+- Enrich `get_lead` with top-level `last_contact_at` and `days_since_last_contact`.
 
-Migration:
-- `ALTER TABLE public.dev_items ADD COLUMN priority text` with check constraint `IN ('P1','P2','P3')`.
-- Backfill: `UPDATE dev_items SET priority = REPLACE(severity, 'S', 'P') WHERE severity IS NOT NULL`.
-- Leave `severity` nullable; document it as "operational impact for live incidents only".
+## 3. Lead data quality
 
-Code:
-- Add `Priority = z.enum(["P1","P2","P3"])` in `schemas.ts`; add `priority` to `create_dev_item` / `update_dev_item` / `list_dev_items` filter.
-- `src/lib/ptops-types.ts`: add `priority: DevPriority | null` to `DevItem`.
-- `src/routes/dev.tsx`: replace the Severity badge/select on build items with Priority (P1/P2/P3); keep Severity field visible only when `type === 'BUG'` (incident-shaped).
+Add `lead_data_quality` action returning per-lead missing-field report + aggregate stats (% missing phone/email/etc.) + `next_actions_needed` list. No automatic backfill — surfaces gaps for Claude to drive cleanup conversation.
 
-## 4. Milestone visual grouping + blocking surfacing
+## 4. Batch endpoint
 
-- `get_dashboard` action: split returned `dev_items` into:
-  - `milestones`: open items where `is_milestone = true`
-  - `dev_items`: open non-milestone items
-  - `blocking_milestones`: milestones that appear in any open item's `blocked_by` array (see #5)
-- `src/routes/index.tsx` (`DevStatusCard`): render Milestones as a separate top section with a "Blocking N features" badge; show a divider before regular dev items.
-- `src/routes/dev.tsx`: add a "Milestones" pinned strip above the status columns on desktop, and a Milestones first card-group on mobile.
+`batch({ operations: [{action, params}, ...] })`, max 25 ops, no nesting (`batch` itself rejected). Runs sequentially, returns `{ results: [{ok, data?, error?}, ...] }` preserving order. One failure does NOT abort the rest.
 
-## 5. `blocked_by` dependency field
+## 5. Task ↔ lead linkage in `get_dashboard`
 
-Migration:
-- `ALTER TABLE public.dev_items ADD COLUMN blocked_by uuid[] NOT NULL DEFAULT '{}'`.
-- Add GIN index for array containment lookups.
+- Attach `lead: { id, name, stage }` inline on each task with `lead_id`.
+- Add derived `tasks_by_lead` grouping (only leads with ≥1 open task) for pre-call prep.
 
-Code:
-- Schemas: `blocked_by: z.array(uuid).optional()` on create/update.
-- `list_dev_items`: support `blocking: uuid` filter (`.contains('blocked_by',[id])`) and `ready_only: boolean` filter ("all blockers resolved").
-- New derived action `list_unblocked` (or include `unblocked_now: DevItem[]` in `get_dashboard`): for every open item, return those whose `blocked_by` IDs all have status in `(RESOLVED, WONT_FIX)`.
-- `src/routes/dev.tsx`: in the edit/create sheet, multi-select picker bound to existing dev_items; show "Blocked by:" chips on the item card; show "Unblocks: …" on milestone cards.
+## 6. Filters on list endpoints
 
-## 6. Domain-weighted task ranking
+- `list_tasks`: add `due_before`, `due_after`, `has_lead`, `search` (ILIKE title/notes); accept `status` as string or array.
+- `list_leads`: add `search` (name/business_name/phone/email), `next_action_before`, `next_action_after`; accept `stage` as string or array.
+- `list_dev_items`: add `search` (title/description); accept `status` and `type` as string or array.
 
-Update `rankTasks` in `src/lib/ptops-logic.ts` to apply a domain weight when `ai_rank` is null/tied:
+All filters optional, fully backwards compatible.
 
-```
-weight(domain) = PRODUCT: 0, OPS: 1, SALES: 2, STRATEGY: 3
-order: ai_rank → priority → domainWeight → due_date
-```
+## 7. NEW — Delete coverage
 
-PRODUCT tasks (build-pipeline blockers for Eidan) float to the top among ties. Update `src/lib/__tests__/ptops-logic.test.ts` with a new case asserting PRODUCT beats SALES at equal priority/due_date. The agent's `list_tasks` SQL ordering stays as-is (DB sort is just `priority, due_date`); UI ranking via `rankTasks` is the surface that matters since the daily-briefing logic is gone.
+Currently `delete_task` and `delete_dev_item` exist. Add the missing ones:
+
+- **`delete_lead({ id, cascade?: boolean = false })`**
+  - With `cascade: false` (default): refuse if the lead has linked tasks or contacts, returning `{ ok: false, error: "Lead has N tasks and M contacts. Pass cascade:true to delete all." }`.
+  - With `cascade: true`: delete `lead_contacts` for the lead, null out `tasks.lead_id` (preserve task history), then delete the lead.
+- **`delete_contact({ id })`** — delete a single `lead_contacts` row scoped to `user_id`.
+- **`delete_business_context_key({ key })`** — delete one row from `business_context` for the admin user.
+- All return `{ deleted: true, id }` (or a structured refusal in the lead-cascade case).
+
+## 8. NEW — Context write surface
+
+`update_business_context` already exists (bulk upsert). Add finer-grained complements that map better to natural assistant flows:
+
+- **`set_business_context({ key, value })`** — single-key upsert. Validates `key` against the expanded `CONTEXT_KEYS` allowlist (rejects unknown keys to prevent schema drift).
+- **`append_business_context({ key, value, separator?: "\n" })`** — read current value, append `separator + value`, upsert. Useful for `active_warnings` and `current_blockers` log-style fields.
+- **`clear_business_context_key({ key })`** — sets value to empty string (preserves the row + history) vs. `delete_business_context_key` which removes it entirely.
+
+All three reuse the existing `business_context` table — no schema change.
 
 ## Out of scope
-- No changes to auth, CRM, or mobile shell.
-- No new tables; severity column is kept (repurposed, not dropped) to avoid breaking historical data.
-- No edge functions; everything stays in the existing TanStack server route + Supabase client.
 
-## Verification
-- `POST /api/public/claude-agent` with `{action:"delete_dev_item", params:{id}}` returns `{ok:true}` and the row is gone.
-- `GET /api/public/claude-agent` returns JSON, not a redirect-to-empty.
-- `get_dashboard` returns `milestones`, `dev_items`, `blocking_milestones`, `unblocked_now` keys.
-- Dev page shows Milestones grouped above other items with a "blocks N" badge.
-- Unit test for `rankTasks` confirms PRODUCT-domain task wins over SALES at equal priority.
+- No new tables, no auth changes, no UI for the new actions.
+- No webhook / realtime push.
+- No automatic backfill of lead fields.
+
+## Files touched
+
+- `src/lib/claude-agent/schemas.ts` — new schemas, expanded filters, batch, deletes, context writes.
+- `src/lib/claude-agent/actions.server.ts` — new handlers, dashboard join, filter wiring, batch dispatcher, cascade delete logic.
+- `src/routes/api/public/claude-agent.ts` — register new actions in `dispatch()` and `VALID_ACTIONS`.
+- `src/lib/ptops-types.ts` — extended `CONTEXT_KEYS`.
+- `src/routes/context.tsx` — labels for new context keys.
+- One `supabase--insert` seed for default `business_context` rows.
