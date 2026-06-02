@@ -32,7 +32,7 @@ export async function get_dashboard(sb: SB, userId: string) {
     sb.from("leads").select("id,name,business_name,phone,stage,next_action,next_action_date,monthly_value_nis,source,created_at")
       .eq("user_id", userId),
     sb.from("dev_items").select("id,title,type,severity,priority,status,target_date,is_milestone,blocked_by,assigned_to"),
-    sb.from("business_context").select("key,value").eq("user_id", userId),
+    sb.from("business_context").select("key,value,updated_at").eq("user_id", userId),
     sb.from("tasks").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("completed_at", weekStart),
     sb.from("tasks").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", weekStart),
   ]);
@@ -71,14 +71,40 @@ export async function get_dashboard(sb: SB, userId: string) {
     });
   });
 
+  const tasks = (tasksR.data ?? []) as any[];
+  const leadsById = new Map(leads.map((l: any) => [l.id, l] as const));
+  const tasksEnriched = tasks.map((t) => {
+    if (!t.lead_id) return t;
+    const l = leadsById.get(t.lead_id);
+    return l ? { ...t, lead: { id: l.id, name: l.name, stage: l.stage } } : t;
+  });
+  const openStatuses = new Set(["TODO", "IN_PROGRESS", "BLOCKED"]);
+  const tasksByLeadMap = new Map<string, any>();
+  for (const t of tasksEnriched) {
+    if (!t.lead_id || !openStatuses.has(t.status)) continue;
+    const l = leadsById.get(t.lead_id);
+    if (!l) continue;
+    let entry = tasksByLeadMap.get(t.lead_id);
+    if (!entry) {
+      entry = { lead_id: l.id, lead_name: l.name, stage: l.stage, open_tasks: [] };
+      tasksByLeadMap.set(t.lead_id, entry);
+    }
+    entry.open_tasks.push({ id: t.id, title: t.title, priority: t.priority, status: t.status, due_date: t.due_date });
+  }
+
+  const ctxList = (ctxR.data ?? []) as any[];
+  const ctxKv: Record<string, string | null> = {};
+  for (const r of ctxList) ctxKv[r.key] = r.value;
+
   return {
-    tasks: tasksR.data ?? [],
+    tasks: tasksEnriched,
     leads,
+    tasks_by_lead: Array.from(tasksByLeadMap.values()),
     dev_items,
     milestones,
     blocking_milestones,
     unblocked_now,
-    business_context: ctxR.data ?? [],
+    business_context: { kv: ctxKv, list: ctxList },
     weekly_completion: { done: weekDoneR.count ?? 0, created: weekCreatedR.count ?? 0 },
     overdue_leads,
     mrr_nis,
@@ -89,9 +115,17 @@ export async function get_dashboard(sb: SB, userId: string) {
 export async function list_tasks(sb: SB, userId: string, raw: unknown) {
   const p = Schemas.list_tasks.parse(raw ?? {});
   let q = sb.from("tasks").select("*").eq("user_id", userId);
-  if (p.status) q = q.eq("status", p.status);
+  if (p.status) {
+    if (Array.isArray(p.status)) q = q.in("status", p.status);
+    else q = q.eq("status", p.status);
+  }
   if (p.domain) q = q.eq("domain", p.domain);
   if (p.priority != null) q = q.eq("priority", p.priority);
+  if (p.due_before) q = q.lte("due_date", p.due_before);
+  if (p.due_after) q = q.gte("due_date", p.due_after);
+  if (p.has_lead === true) q = q.not("lead_id", "is", null);
+  if (p.has_lead === false) q = q.is("lead_id", null);
+  if (p.search) q = q.or(`title.ilike.%${p.search}%,notes.ilike.%${p.search}%`);
   q = q.order("priority", { ascending: true }).order("due_date", { ascending: true, nullsFirst: false }).limit(p.limit);
   const { data, error } = await q;
   if (error) throw error;
@@ -138,9 +172,18 @@ export async function complete_task(sb: SB, userId: string, raw: unknown) {
 export async function list_leads(sb: SB, userId: string, raw: unknown) {
   const p = Schemas.list_leads.parse(raw ?? {});
   let q = sb.from("leads").select("*").eq("user_id", userId);
-  if (p.stage) q = q.eq("stage", p.stage);
+  if (p.stage) {
+    if (Array.isArray(p.stage)) q = q.in("stage", p.stage);
+    else q = q.eq("stage", p.stage);
+  }
   if (p.source) q = q.eq("source", p.source);
   if (p.overdue_only) q = q.lt("next_action_date", today()).not("stage", "in", "(WON,LOST,ON_HOLD)");
+  if (p.next_action_before) q = q.lte("next_action_date", p.next_action_before);
+  if (p.next_action_after) q = q.gte("next_action_date", p.next_action_after);
+  if (p.search) {
+    const s = p.search;
+    q = q.or(`name.ilike.%${s}%,business_name.ilike.%${s}%,phone.ilike.%${s}%,email.ilike.%${s}%`);
+  }
   q = q.order("updated_at", { ascending: false }).limit(p.limit);
   const { data, error } = await q;
   if (error) throw error;
@@ -156,7 +199,12 @@ export async function get_lead(sb: SB, userId: string, raw: unknown) {
   if (leadR.error) throw leadR.error;
   if (!leadR.data) throw new Error("Lead not found");
   if (contactsR.error) throw contactsR.error;
-  return { ...leadR.data, contacts: contactsR.data ?? [] };
+  const contacts = (contactsR.data ?? []) as any[];
+  const last = contacts[0]?.contact_date ?? null;
+  const days_since_last_contact = last
+    ? Math.floor((Date.now() - new Date(last).getTime()) / 86400000)
+    : null;
+  return { ...leadR.data, contacts, last_contact_at: last, days_since_last_contact };
 }
 
 export async function create_lead(sb: SB, userId: string, raw: unknown) {
@@ -223,13 +271,20 @@ export async function get_pipeline_summary(sb: SB, userId: string) {
 export async function list_dev_items(sb: SB, _userId: string, raw: unknown) {
   const p = Schemas.list_dev_items.parse(raw ?? {});
   let q = sb.from("dev_items").select("*");
-  if (p.type) q = q.eq("type", p.type);
+  if (p.type) {
+    if (Array.isArray(p.type)) q = q.in("type", p.type);
+    else q = q.eq("type", p.type);
+  }
   if (p.severity) q = q.eq("severity", p.severity);
   if (p.priority) q = q.eq("priority", p.priority);
-  if (p.status) q = q.eq("status", p.status);
+  if (p.status) {
+    if (Array.isArray(p.status)) q = q.in("status", p.status);
+    else q = q.eq("status", p.status);
+  }
   if (typeof p.is_milestone === "boolean") q = q.eq("is_milestone", p.is_milestone);
   if (p.open_only) q = q.not("status", "in", "(RESOLVED,WONT_FIX)");
   if (p.blocking) q = q.contains("blocked_by", [p.blocking]);
+  if (p.search) q = q.or(`title.ilike.%${p.search}%,description.ilike.%${p.search}%`);
   q = q.order("created_at", { ascending: false });
   const { data, error } = await q;
   if (error) throw error;
@@ -301,11 +356,12 @@ export async function delete_dev_item(sb: SB, _userId: string, raw: unknown) {
 
 // ---------- BUSINESS CONTEXT ----------
 export async function get_business_context(sb: SB, userId: string) {
-  const { data, error } = await sb.from("business_context").select("key,value").eq("user_id", userId);
+  const { data, error } = await sb.from("business_context").select("key,value,updated_at").eq("user_id", userId);
   if (error) throw error;
-  const out: Record<string, string | null> = {};
-  for (const r of data ?? []) out[r.key] = r.value;
-  return out;
+  const list = (data ?? []) as any[];
+  const kv: Record<string, string | null> = {};
+  for (const r of list) kv[r.key] = r.value;
+  return { kv, list };
 }
 
 export async function update_business_context(sb: SB, userId: string, raw: unknown) {
@@ -318,5 +374,141 @@ export async function update_business_context(sb: SB, userId: string, raw: unkno
   return get_business_context(sb, userId);
 }
 
+export async function set_business_context(sb: SB, userId: string, raw: unknown) {
+  const { key, value } = Schemas.set_business_context.parse(raw);
+  const { error } = await sb.from("business_context").upsert(
+    { user_id: userId, key, value, updated_at: new Date().toISOString() },
+    { onConflict: "user_id,key" },
+  );
+  if (error) throw error;
+  return { key, value };
+}
+
+export async function append_business_context(sb: SB, userId: string, raw: unknown) {
+  const { key, value, separator } = Schemas.append_business_context.parse(raw);
+  const { data: existing, error: readErr } = await sb
+    .from("business_context").select("value").eq("user_id", userId).eq("key", key).maybeSingle();
+  if (readErr) throw readErr;
+  const prev = existing?.value ?? "";
+  const next = prev ? `${prev}${separator}${value}` : value;
+  const { error } = await sb.from("business_context").upsert(
+    { user_id: userId, key, value: next, updated_at: new Date().toISOString() },
+    { onConflict: "user_id,key" },
+  );
+  if (error) throw error;
+  return { key, value: next };
+}
+
+export async function clear_business_context_key(sb: SB, userId: string, raw: unknown) {
+  const { key } = Schemas.clear_business_context_key.parse(raw);
+  const { error } = await sb.from("business_context").upsert(
+    { user_id: userId, key, value: "", updated_at: new Date().toISOString() },
+    { onConflict: "user_id,key" },
+  );
+  if (error) throw error;
+  return { key, value: "" };
+}
+
+export async function delete_business_context_key(sb: SB, userId: string, raw: unknown) {
+  const { key } = Schemas.delete_business_context_key.parse(raw);
+  const { error } = await sb.from("business_context").delete().eq("user_id", userId).eq("key", key);
+  if (error) throw error;
+  return { key, deleted: true };
+}
+
+// ---------- CONTACTS (read) ----------
+export async function list_contacts(sb: SB, userId: string, raw: unknown) {
+  const p = Schemas.list_contacts.parse(raw ?? {});
+  let q = sb.from("lead_contacts").select("*").eq("user_id", userId);
+  if (p.lead_id) q = q.eq("lead_id", p.lead_id);
+  if (p.method) q = q.eq("method", p.method);
+  if (p.since) q = q.gte("contact_date", p.since);
+  q = q.order("contact_date", { ascending: false }).limit(p.limit);
+  const { data, error } = await q;
+  if (error) throw error;
+  const rows = (data ?? []) as any[];
+  const leadIds = Array.from(new Set(rows.map((r) => r.lead_id).filter(Boolean)));
+  if (leadIds.length === 0) return rows;
+  const { data: leads } = await sb.from("leads").select("id,name,stage").in("id", leadIds);
+  const byId = new Map(((leads ?? []) as any[]).map((l) => [l.id, l]));
+  return rows.map((r) => ({ ...r, lead: byId.get(r.lead_id) ?? null }));
+}
+
+export async function get_lead_contacts(sb: SB, userId: string, raw: unknown) {
+  const { lead_id } = Schemas.get_lead_contacts.parse(raw);
+  const { data, error } = await sb.from("lead_contacts").select("*")
+    .eq("user_id", userId).eq("lead_id", lead_id).order("contact_date", { ascending: false });
+  if (error) throw error;
+  const contacts = (data ?? []) as any[];
+  const last = contacts[0]?.contact_date ?? null;
+  const days_since_last_contact = last
+    ? Math.floor((Date.now() - new Date(last).getTime()) / 86400000)
+    : null;
+  return { lead_id, contacts, last_contact_at: last, days_since_last_contact, count: contacts.length };
+}
+
+export async function delete_contact(sb: SB, userId: string, raw: unknown) {
+  const { id } = Schemas.delete_contact.parse(raw);
+  const { error } = await sb.from("lead_contacts").delete().eq("id", id).eq("user_id", userId);
+  if (error) throw error;
+  return { id, deleted: true };
+}
+
+// ---------- LEAD DELETE + DATA QUALITY ----------
+export async function delete_lead(sb: SB, userId: string, raw: unknown) {
+  const { id, cascade } = Schemas.delete_lead.parse(raw);
+  const [{ count: taskCount }, { count: contactCount }] = await Promise.all([
+    sb.from("tasks").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("lead_id", id),
+    sb.from("lead_contacts").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("lead_id", id),
+  ]);
+  const tc = taskCount ?? 0;
+  const cc = contactCount ?? 0;
+  if (!cascade && (tc > 0 || cc > 0)) {
+    throw new Error(`Lead has ${tc} tasks and ${cc} contacts. Pass cascade:true to delete all.`);
+  }
+  if (cascade) {
+    if (cc > 0) {
+      const { error } = await sb.from("lead_contacts").delete().eq("user_id", userId).eq("lead_id", id);
+      if (error) throw error;
+    }
+    if (tc > 0) {
+      const { error } = await sb.from("tasks").update({ lead_id: null }).eq("user_id", userId).eq("lead_id", id);
+      if (error) throw error;
+    }
+  }
+  const { error } = await sb.from("leads").delete().eq("id", id).eq("user_id", userId);
+  if (error) throw error;
+  return { id, deleted: true, unlinked_tasks: cascade ? tc : 0, deleted_contacts: cascade ? cc : 0 };
+}
+
+export async function lead_data_quality(sb: SB, userId: string) {
+  const { data, error } = await sb.from("leads").select("*").eq("user_id", userId);
+  if (error) throw error;
+  const leads = (data ?? []) as any[];
+  const critical = ["phone", "email", "business_name", "monthly_value_nis", "next_action_date"] as const;
+  const total = leads.length || 1;
+  const counts: Record<string, number> = {};
+  for (const f of critical) counts[f] = 0;
+  const per_lead: any[] = [];
+  const t = today();
+  const next_actions_needed: any[] = [];
+  for (const l of leads) {
+    const missing: string[] = [];
+    for (const f of critical) {
+      const v = (l as any)[f];
+      if (v == null || v === "") {
+        missing.push(f);
+        counts[f]++;
+      }
+    }
+    if (missing.length > 0) per_lead.push({ id: l.id, name: l.name, stage: l.stage, missing });
+    if (!["WON", "LOST", "ON_HOLD"].includes(l.stage) && (!l.next_action_date || l.next_action_date < t)) {
+      next_actions_needed.push({ id: l.id, name: l.name, stage: l.stage, next_action_date: l.next_action_date });
+    }
+  }
+  const aggregate: Record<string, { missing: number; pct: number }> = {};
+  for (const f of critical) aggregate[f] = { missing: counts[f], pct: Math.round((counts[f] / total) * 100) };
+  return { total_leads: leads.length, aggregate, per_lead, next_actions_needed };
+}
 
 export { err };

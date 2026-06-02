@@ -140,9 +140,13 @@ export const CONTEXT_KEYS = [
   "paying_clients",
   "warm_leads",
   "90_day_target",
+  "90_day_priorities",
   "success_threshold",
   "operator_hours",
   "capital_available",
+  "active_warnings",
+  "product_stability",
+  "execution_bias_flag",
   "current_blockers",
 ] as const;
 export type ContextKey = (typeof CONTEXT_KEYS)[number];
