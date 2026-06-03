@@ -214,6 +214,10 @@ export const VALID_ACTIONS = [
   "clear_business_context_key",
   "delete_business_context_key",
   "batch",
+  "list_attachments",
+  "get_attachment",
+  "upload_attachment",
+  "delete_attachment",
 ] as const;
 
 export type ActionName = (typeof VALID_ACTIONS)[number];
