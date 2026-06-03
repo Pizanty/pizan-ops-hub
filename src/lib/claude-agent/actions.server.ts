@@ -512,3 +512,97 @@ export async function lead_data_quality(sb: SB, userId: string) {
 }
 
 export { err };
+
+// ---------- ATTACHMENTS ----------
+const ATTACHMENT_BUCKET = "attachments";
+const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024; // 25 MB
+const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1h
+
+async function signAttachment(sb: SB, storage_path: string): Promise<string | null> {
+  const { data } = await sb.storage.from(ATTACHMENT_BUCKET).createSignedUrl(storage_path, SIGNED_URL_TTL_SECONDS);
+  return data?.signedUrl ?? null;
+}
+
+async function withSignedUrl(sb: SB, row: any) {
+  return { ...row, download_url: await signAttachment(sb, row.storage_path) };
+}
+
+async function assertEntityExists(sb: SB, entity_type: "task" | "dev_item", entity_id: string) {
+  const table = entity_type === "task" ? "tasks" : "dev_items";
+  const { data, error } = await sb.from(table).select("id").eq("id", entity_id).maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error(`${entity_type} ${entity_id} not found`);
+}
+
+export async function list_attachments(sb: SB, _userId: string, raw: unknown) {
+  const { entity_type, entity_id } = Schemas.list_attachments.parse(raw);
+  const { data, error } = await sb.from("attachments").select("*")
+    .eq("entity_type", entity_type).eq("entity_id", entity_id)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  const rows = (data ?? []) as any[];
+  return Promise.all(rows.map((r) => withSignedUrl(sb, r)));
+}
+
+export async function get_attachment(sb: SB, _userId: string, raw: unknown) {
+  const { id } = Schemas.get_attachment.parse(raw);
+  const { data, error } = await sb.from("attachments").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("Attachment not found");
+  return withSignedUrl(sb, data);
+}
+
+export async function upload_attachment(sb: SB, userId: string, raw: unknown) {
+  const p = Schemas.upload_attachment.parse(raw);
+  await assertEntityExists(sb, p.entity_type, p.entity_id);
+
+  let bytes: Buffer;
+  try {
+    bytes = Buffer.from(p.content_base64, "base64");
+  } catch {
+    throw new Error("Invalid base64 content");
+  }
+  if (bytes.length === 0) throw new Error("Empty file");
+  if (bytes.length > MAX_ATTACHMENT_BYTES) {
+    throw new Error(`File too large: ${bytes.length} bytes (max ${MAX_ATTACHMENT_BYTES})`);
+  }
+
+  const attachment_id = crypto.randomUUID();
+  const safeName = p.filename.replace(/[^\w.\-]+/g, "_").slice(0, 200);
+  const storage_path = `${p.entity_type}/${p.entity_id}/${attachment_id}-${safeName}`;
+  const mime_type = p.mime_type ?? "application/octet-stream";
+
+  const { error: upErr } = await sb.storage.from(ATTACHMENT_BUCKET).upload(storage_path, bytes, {
+    contentType: mime_type,
+    upsert: false,
+  });
+  if (upErr) throw upErr;
+
+  const { data: row, error } = await sb.from("attachments").insert({
+    id: attachment_id,
+    user_id: userId,
+    entity_type: p.entity_type,
+    entity_id: p.entity_id,
+    bucket: ATTACHMENT_BUCKET,
+    storage_path,
+    filename: p.filename,
+    mime_type,
+    size_bytes: bytes.length,
+  }).select("*").single();
+  if (error) {
+    await sb.storage.from(ATTACHMENT_BUCKET).remove([storage_path]).catch(() => {});
+    throw error;
+  }
+  return withSignedUrl(sb, row);
+}
+
+export async function delete_attachment(sb: SB, _userId: string, raw: unknown) {
+  const { id } = Schemas.delete_attachment.parse(raw);
+  const { data: row, error: readErr } = await sb.from("attachments").select("*").eq("id", id).maybeSingle();
+  if (readErr) throw readErr;
+  if (!row) throw new Error("Attachment not found");
+  await sb.storage.from(ATTACHMENT_BUCKET).remove([row.storage_path]).catch(() => {});
+  const { error } = await sb.from("attachments").delete().eq("id", id);
+  if (error) throw error;
+  return { id, deleted: true };
+}

@@ -1,75 +1,57 @@
+## Goal
+Add file attachments to **tasks** and **dev_items**, with upload + download available both via the web UI (you) and via the Claude Agent API (Claude).
 
-# Claude Agent API — Round 2
+## Architecture
 
-Targeted improvements to make the Claude API usable as a real assistant interface, plus full delete + context-write coverage. All changes scoped to `src/lib/claude-agent/*` and `src/routes/api/public/claude-agent.ts` — no UI changes, no auth, no new tables (one seed pass only).
+### 1. Storage
+- New private Supabase Storage bucket: **`attachments`** (created via `storage_create_bucket`, public=false).
+- Object path convention: `{entity_type}/{entity_id}/{attachment_id}-{filename}` where `entity_type ∈ {task, dev_item}`. This makes per-entity listing/cleanup trivial.
+- Max size enforced in API: 25 MB per file (configurable constant).
 
-## 1. `get_business_context` returns empty → seed defaults + expanded keys
+### 2. Database
+New table `public.attachments`:
+- `id uuid pk`, `user_id uuid` (uploader), `entity_type text check in ('task','dev_item')`, `entity_id uuid`, `bucket text default 'attachments'`, `storage_path text`, `filename text`, `mime_type text`, `size_bytes bigint`, `created_at timestamptz`.
+- Index on `(entity_type, entity_id)`.
+- RLS: admin/developer can select/insert/delete their workspace's rows (mirrors existing tasks/dev_items policy style). `service_role` full access (used by Claude API + signed URLs).
+- Storage RLS on `storage.objects` for bucket `attachments`: authenticated users can read/write; service_role bypasses.
 
-- Extend `CONTEXT_KEYS` in `src/lib/ptops-types.ts` with high-signal fields: `90_day_priorities`, `active_warnings`, `product_stability`, `execution_bias_flag` (plus existing keys).
-- Seed admin user's `business_context` with placeholder values via `supabase--insert` so the endpoint returns populated data immediately.
-- Update `get_business_context` to return `{ kv: {...}, list: [{key,value,updated_at}] }` — map for convenience, list for timestamps.
-- `src/routes/context.tsx` picks up new keys automatically; add their labels to `LABELS`.
+### 3. Web UI (you)
+- Reusable `<AttachmentsPanel entityType entityId />` component used in:
+  - `src/routes/tasks.$id.tsx`
+  - `src/routes/dev.$id.tsx`
+- Features: drag-and-drop / file picker upload, list with filename + size + uploader + date, download (opens signed URL), delete (with confirm).
+- Uses `supabase.storage.from('attachments').upload(...)` + insert row, all under the user's session (RLS-scoped).
 
-## 2. Contact log retrieval
+### 4. Claude Agent API
+New actions in `src/lib/claude-agent/actions.server.ts` + `schemas.ts` + dispatcher:
 
-Add to schemas, `VALID_ACTIONS`, `actions.server.ts`, and `dispatch()`:
-- `list_contacts({ lead_id?, since?, method?, limit=50 })` — across all leads, newest first, joined with lead name.
-- `get_lead_contacts({ lead_id })` — full history + `days_since_last_contact`.
-- Enrich `get_lead` with top-level `last_contact_at` and `days_since_last_contact`.
+| Action | Params | Returns |
+|---|---|---|
+| `list_attachments` | `{ entity_type, entity_id }` | array of attachment rows (with `download_url` signed for 1h) |
+| `get_attachment` | `{ id }` | row + signed `download_url` |
+| `upload_attachment` | `{ entity_type, entity_id, filename, mime_type, content_base64 }` | created row + signed `download_url` |
+| `delete_attachment` | `{ id }` | `{ deleted: true, id }` |
 
-## 3. Lead data quality
+- `upload_attachment` decodes base64, enforces 25 MB limit, validates entity exists, uploads via `supabaseAdmin.storage`, inserts row.
+- `delete_attachment` removes storage object then row.
+- All added to `VALID_ACTIONS`, work inside `batch`.
+- `get_dashboard` / `get_task` / `get_dev_item` enriched with `attachment_count` (cheap count query), so Claude knows when to fetch.
 
-Add `lead_data_quality` action returning per-lead missing-field report + aggregate stats (% missing phone/email/etc.) + `next_actions_needed` list. No automatic backfill — surfaces gaps for Claude to drive cleanup conversation.
+### 5. API summary doc
+Update `/mnt/documents/claude-api-summary.md` with the 4 new actions, base64 upload example, and the 1h signed-URL note.
 
-## 4. Batch endpoint
-
-`batch({ operations: [{action, params}, ...] })`, max 25 ops, no nesting (`batch` itself rejected). Runs sequentially, returns `{ results: [{ok, data?, error?}, ...] }` preserving order. One failure does NOT abort the rest.
-
-## 5. Task ↔ lead linkage in `get_dashboard`
-
-- Attach `lead: { id, name, stage }` inline on each task with `lead_id`.
-- Add derived `tasks_by_lead` grouping (only leads with ≥1 open task) for pre-call prep.
-
-## 6. Filters on list endpoints
-
-- `list_tasks`: add `due_before`, `due_after`, `has_lead`, `search` (ILIKE title/notes); accept `status` as string or array.
-- `list_leads`: add `search` (name/business_name/phone/email), `next_action_before`, `next_action_after`; accept `stage` as string or array.
-- `list_dev_items`: add `search` (title/description); accept `status` and `type` as string or array.
-
-All filters optional, fully backwards compatible.
-
-## 7. NEW — Delete coverage
-
-Currently `delete_task` and `delete_dev_item` exist. Add the missing ones:
-
-- **`delete_lead({ id, cascade?: boolean = false })`**
-  - With `cascade: false` (default): refuse if the lead has linked tasks or contacts, returning `{ ok: false, error: "Lead has N tasks and M contacts. Pass cascade:true to delete all." }`.
-  - With `cascade: true`: delete `lead_contacts` for the lead, null out `tasks.lead_id` (preserve task history), then delete the lead.
-- **`delete_contact({ id })`** — delete a single `lead_contacts` row scoped to `user_id`.
-- **`delete_business_context_key({ key })`** — delete one row from `business_context` for the admin user.
-- All return `{ deleted: true, id }` (or a structured refusal in the lead-cascade case).
-
-## 8. NEW — Context write surface
-
-`update_business_context` already exists (bulk upsert). Add finer-grained complements that map better to natural assistant flows:
-
-- **`set_business_context({ key, value })`** — single-key upsert. Validates `key` against the expanded `CONTEXT_KEYS` allowlist (rejects unknown keys to prevent schema drift).
-- **`append_business_context({ key, value, separator?: "\n" })`** — read current value, append `separator + value`, upsert. Useful for `active_warnings` and `current_blockers` log-style fields.
-- **`clear_business_context_key({ key })`** — sets value to empty string (preserves the row + history) vs. `delete_business_context_key` which removes it entirely.
-
-All three reuse the existing `business_context` table — no schema change.
+## Files to touch
+- **Migration**: create `attachments` table + RLS + indexes.
+- **Storage**: create `attachments` bucket (private) + storage.objects RLS.
+- **Backend**: `src/lib/claude-agent/schemas.ts`, `src/lib/claude-agent/actions.server.ts`, `src/routes/api/public/claude-agent.ts`, `src/lib/ptops-types.ts` (add `Attachment` type).
+- **Frontend**: new `src/components/attachments-panel.tsx`; mount in `src/routes/tasks.$id.tsx` and `src/routes/dev.$id.tsx`.
+- **Doc**: regenerate `/mnt/documents/claude-api-summary.md`.
 
 ## Out of scope
+- Inline image previews beyond a simple thumbnail for `image/*`.
+- Attachments on leads or contacts (easy to extend later by adding `'lead'` to the enum).
+- Virus scanning, versioning, multi-file zip download.
+- Per-attachment ACLs beyond workspace-wide.
 
-- No new tables, no auth changes, no UI for the new actions.
-- No webhook / realtime push.
-- No automatic backfill of lead fields.
-
-## Files touched
-
-- `src/lib/claude-agent/schemas.ts` — new schemas, expanded filters, batch, deletes, context writes.
-- `src/lib/claude-agent/actions.server.ts` — new handlers, dashboard join, filter wiring, batch dispatcher, cascade delete logic.
-- `src/routes/api/public/claude-agent.ts` — register new actions in `dispatch()` and `VALID_ACTIONS`.
-- `src/lib/ptops-types.ts` — extended `CONTEXT_KEYS`.
-- `src/routes/context.tsx` — labels for new context keys.
-- One `supabase--insert` seed for default `business_context` rows.
+## Open question
+**Default size limit: 25 MB OK, or do you want larger (e.g. 100 MB)?** Anything above ~50 MB will require Claude to use direct-to-storage signed-URL uploads instead of base64 in the JSON body — let me know and I'll add a `create_attachment_upload_url` action for that flow too.

@@ -106,6 +106,19 @@ export interface BusinessContextRow {
   updated_at: string;
 }
 
+export interface Attachment {
+  id: string;
+  user_id: string;
+  entity_type: "task" | "dev_item";
+  entity_id: string;
+  bucket: string;
+  storage_path: string;
+  filename: string;
+  mime_type: string | null;
+  size_bytes: number | null;
+  created_at: string;
+}
+
 export const DOMAINS: Domain[] = ["SALES", "PRODUCT", "OPS", "STRATEGY"];
 export const TASK_STATUSES: TaskStatus[] = ["TODO", "IN_PROGRESS", "BLOCKED", "DONE", "ARCHIVED"];
 export const LEAD_STAGES: LeadStage[] = [
