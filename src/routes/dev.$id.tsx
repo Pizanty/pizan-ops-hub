@@ -138,6 +138,8 @@ function DevDetail() {
                     </ul>
                   )}
                 </div>
+
+                <AttachmentsPanel entityType="dev_item" entityId={item.id} />
               </div>
             </GlassDialogBody>
             <GlassDialogFooter>
