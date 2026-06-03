@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { DOMAINS, TASK_STATUSES, type Domain, type Task, type TaskStatus } from "@/lib/ptops-types";
+import { AttachmentsPanel } from "@/components/attachments-panel";
 
 export const Route = createFileRoute("/tasks/$id")({ component: TaskDetail });
 
