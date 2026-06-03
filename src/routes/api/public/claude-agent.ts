@@ -66,6 +66,10 @@ async function dispatch(action: string, userId: string, params: unknown): Promis
     case "append_business_context": return A.append_business_context(supabaseAdmin, userId, params);
     case "clear_business_context_key": return A.clear_business_context_key(supabaseAdmin, userId, params);
     case "delete_business_context_key": return A.delete_business_context_key(supabaseAdmin, userId, params);
+    case "list_attachments": return A.list_attachments(supabaseAdmin, userId, params);
+    case "get_attachment": return A.get_attachment(supabaseAdmin, userId, params);
+    case "upload_attachment": return A.upload_attachment(supabaseAdmin, userId, params);
+    case "delete_attachment": return A.delete_attachment(supabaseAdmin, userId, params);
     case "batch": {
       const parsed = (await import("@/lib/claude-agent/schemas")).Schemas.batch.parse(params);
       const results: Array<{ ok: boolean; action: string; data?: unknown; error?: string }> = [];
