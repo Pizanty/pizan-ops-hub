@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      attachments: {
+        Row: {
+          bucket: string
+          created_at: string
+          entity_id: string
+          entity_type: string
+          filename: string
+          id: string
+          mime_type: string | null
+          size_bytes: number | null
+          storage_path: string
+          user_id: string
+        }
+        Insert: {
+          bucket?: string
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          filename: string
+          id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          storage_path: string
+          user_id: string
+        }
+        Update: {
+          bucket?: string
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          filename?: string
+          id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          storage_path?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       business_context: {
         Row: {
           id: string
