@@ -166,6 +166,20 @@ export const Schemas = {
       .min(1)
       .max(25),
   }),
+
+  list_attachments: z.object({
+    entity_type: z.enum(["task", "dev_item"]),
+    entity_id: uuid,
+  }),
+  get_attachment: z.object({ id: uuid }),
+  upload_attachment: z.object({
+    entity_type: z.enum(["task", "dev_item"]),
+    entity_id: uuid,
+    filename: z.string().min(1).max(255),
+    mime_type: z.string().min(1).max(255).optional(),
+    content_base64: z.string().min(1),
+  }),
+  delete_attachment: z.object({ id: uuid }),
 };
 
 export const VALID_ACTIONS = [
