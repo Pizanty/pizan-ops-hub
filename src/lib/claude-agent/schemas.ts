@@ -242,6 +242,12 @@ export const VALID_ACTIONS = [
   "get_attachment",
   "upload_attachment",
   "delete_attachment",
+  "list_task_stages",
+  "add_task_stage",
+  "update_task_stage",
+  "delete_task_stage",
+  "reorder_task_stages",
+  "set_task_stages",
 ] as const;
 
 export type ActionName = (typeof VALID_ACTIONS)[number];
