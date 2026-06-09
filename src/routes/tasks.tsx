@@ -320,3 +320,19 @@ function TaskSheet({ open, onOpenChange, task }: { open: boolean; onOpenChange: 
 }
 
 export { TaskSheet };
+
+function StageProgress({ summary }: { summary?: { total: number; done: number; current: string | null } }) {
+  if (!summary || summary.total === 0) return null;
+  const pct = Math.round((summary.done / summary.total) * 100);
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border bg-muted/40 px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
+      title={summary.current ? `Next: ${summary.current}` : "All stages done"}
+    >
+      <span className="relative inline-block h-1 w-8 overflow-hidden rounded-full bg-muted">
+        <span className="absolute inset-y-0 left-0 bg-gradient-primary" style={{ width: `${pct}%` }} />
+      </span>
+      {summary.done}/{summary.total}
+    </span>
+  );
+}
