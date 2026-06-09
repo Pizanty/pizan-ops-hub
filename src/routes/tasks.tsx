@@ -45,6 +45,32 @@ function TasksPage() {
     },
   });
 
+  const { data: stageRows = [] } = useQuery({
+    queryKey: ["task_stages", "all", user?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("task_stages")
+        .select("task_id,done,position,label")
+        .eq("user_id", user!.id)
+        .order("position", { ascending: true });
+      if (error) throw error;
+      return data as { task_id: string; done: boolean; position: number; label: string }[];
+    },
+  });
+
+  const stageSummary = (() => {
+    const map = new Map<string, { total: number; done: number; current: string | null }>();
+    for (const r of stageRows) {
+      const e = map.get(r.task_id) ?? { total: 0, done: 0, current: null };
+      e.total += 1;
+      if (r.done) e.done += 1;
+      else if (e.current == null) e.current = r.label;
+      map.set(r.task_id, e);
+    }
+    return map;
+  })();
+
   const tasks = (() => {
     const active = rankTasks(allTasks);
     const completed = allTasks
