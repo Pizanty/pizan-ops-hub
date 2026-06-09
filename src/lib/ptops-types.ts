@@ -119,6 +119,18 @@ export interface Attachment {
   created_at: string;
 }
 
+export interface TaskStage {
+  id: string;
+  task_id: string;
+  user_id: string;
+  label: string;
+  position: number;
+  done: boolean;
+  done_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export const DOMAINS: Domain[] = ["SALES", "PRODUCT", "OPS", "STRATEGY"];
 export const TASK_STATUSES: TaskStatus[] = ["TODO", "IN_PROGRESS", "BLOCKED", "DONE", "ARCHIVED"];
 export const LEAD_STAGES: LeadStage[] = [
