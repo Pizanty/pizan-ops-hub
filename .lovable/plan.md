@@ -1,57 +1,78 @@
-## Goal
-Add file attachments to **tasks** and **dev_items**, with upload + download available both via the web UI (you) and via the Claude Agent API (Claude).
+# Task Stage Checklists
 
-## Architecture
+Add a per-task ordered checklist of "stages" (sub-steps the user works through and checks off). Same model across all domains. Available in the web UI and via the Claude Agent API.
 
-### 1. Storage
-- New private Supabase Storage bucket: **`attachments`** (created via `storage_create_bucket`, public=false).
-- Object path convention: `{entity_type}/{entity_id}/{attachment_id}-{filename}` where `entity_type ∈ {task, dev_item}`. This makes per-entity listing/cleanup trivial.
-- Max size enforced in API: 25 MB per file (configurable constant).
+## Data model
 
-### 2. Database
-New table `public.attachments`:
-- `id uuid pk`, `user_id uuid` (uploader), `entity_type text check in ('task','dev_item')`, `entity_id uuid`, `bucket text default 'attachments'`, `storage_path text`, `filename text`, `mime_type text`, `size_bytes bigint`, `created_at timestamptz`.
-- Index on `(entity_type, entity_id)`.
-- RLS: admin/developer can select/insert/delete their workspace's rows (mirrors existing tasks/dev_items policy style). `service_role` full access (used by Claude API + signed URLs).
-- Storage RLS on `storage.objects` for bucket `attachments`: authenticated users can read/write; service_role bypasses.
+New table `public.task_stages`:
 
-### 3. Web UI (you)
-- Reusable `<AttachmentsPanel entityType entityId />` component used in:
-  - `src/routes/tasks.$id.tsx`
-  - `src/routes/dev.$id.tsx`
-- Features: drag-and-drop / file picker upload, list with filename + size + uploader + date, download (opens signed URL), delete (with confirm).
-- Uses `supabase.storage.from('attachments').upload(...)` + insert row, all under the user's session (RLS-scoped).
+- `id uuid pk`
+- `task_id uuid fk → tasks(id) on delete cascade`
+- `user_id uuid` (owner, mirrors `tasks.user_id` for RLS)
+- `label text not null`
+- `position int not null` (ordering)
+- `done bool not null default false`
+- `done_at timestamptz`
+- `created_at`, `updated_at`
 
-### 4. Claude Agent API
-New actions in `src/lib/claude-agent/actions.server.ts` + `schemas.ts` + dispatcher:
+RLS: user can manage stages where `user_id = auth.uid()`. GRANTs to `authenticated` + `service_role`. Trigger: when `done` flips true set `done_at = now()`, flips false → null.
 
-| Action | Params | Returns |
-|---|---|---|
-| `list_attachments` | `{ entity_type, entity_id }` | array of attachment rows (with `download_url` signed for 1h) |
-| `get_attachment` | `{ id }` | row + signed `download_url` |
-| `upload_attachment` | `{ entity_type, entity_id, filename, mime_type, content_base64 }` | created row + signed `download_url` |
-| `delete_attachment` | `{ id }` | `{ deleted: true, id }` |
+Derived helpers (computed in app/API, not stored):
+- `stage_count`, `stages_done`, `progress_pct`
+- `current_stage`: first stage with `done=false` ordered by `position`
 
-- `upload_attachment` decodes base64, enforces 25 MB limit, validates entity exists, uploads via `supabaseAdmin.storage`, inserts row.
-- `delete_attachment` removes storage object then row.
-- All added to `VALID_ACTIONS`, work inside `batch`.
-- `get_dashboard` / `get_task` / `get_dev_item` enriched with `attachment_count` (cheap count query), so Claude knows when to fetch.
+## Claude Agent API
 
-### 5. API summary doc
-Update `/mnt/documents/claude-api-summary.md` with the 4 new actions, base64 upload example, and the 1h signed-URL note.
+New actions in `src/lib/claude-agent/{schemas,actions.server}.ts` and dispatcher:
 
-## Files to touch
-- **Migration**: create `attachments` table + RLS + indexes.
-- **Storage**: create `attachments` bucket (private) + storage.objects RLS.
-- **Backend**: `src/lib/claude-agent/schemas.ts`, `src/lib/claude-agent/actions.server.ts`, `src/routes/api/public/claude-agent.ts`, `src/lib/ptops-types.ts` (add `Attachment` type).
-- **Frontend**: new `src/components/attachments-panel.tsx`; mount in `src/routes/tasks.$id.tsx` and `src/routes/dev.$id.tsx`.
-- **Doc**: regenerate `/mnt/documents/claude-api-summary.md`.
+- `list_task_stages { task_id }` → ordered stages
+- `add_task_stage { task_id, label, position? }` → appends (or inserts at position)
+- `update_task_stage { id, label?, position?, done? }`
+- `delete_task_stage { id }`
+- `reorder_task_stages { task_id, ordered_ids: string[] }` → bulk set positions
+- `set_task_stages { task_id, labels: string[] }` → replace whole checklist (convenience)
 
-## Out of scope
-- Inline image previews beyond a simple thumbnail for `image/*`.
-- Attachments on leads or contacts (easy to extend later by adding `'lead'` to the enum).
-- Virus scanning, versioning, multi-file zip download.
-- Per-attachment ACLs beyond workspace-wide.
+Enrich existing payloads:
+- `get_task` / `list_tasks` items gain `stage_count`, `stages_done`, `progress_pct`, `current_stage`
+- `get_dashboard` task entries include the same summary fields
+- `create_task` accepts optional `stages: string[]` to seed the checklist
+- Update `/mnt/documents/claude-api-summary.md` with the new actions
 
-## Open question
-**Default size limit: 25 MB OK, or do you want larger (e.g. 100 MB)?** Anything above ~50 MB will require Claude to use direct-to-storage signed-URL uploads instead of base64 in the JSON body — let me know and I'll add a `create_attachment_upload_url` action for that flow too.
+## Web UI
+
+- `src/components/task-stages-panel.tsx`: ordered checklist with add row, inline-edit label, checkbox to toggle done, drag handle (dnd-kit if installed, otherwise up/down arrow buttons to keep scope tight), delete button, progress bar header (`X / Y · Z%`).
+- Embed the panel inside `src/routes/tasks.$id.tsx` next to AttachmentsPanel.
+- On the tasks list (`src/routes/tasks.tsx`): show a compact progress indicator (e.g. `3/5`) and `current_stage` label when present.
+- Auto-complete behavior (opt-in, documented): toggling the last remaining stage to done does NOT auto-set task status — keep status independent so the user/agent decide.
+
+## Types
+
+Add to `src/lib/ptops-types.ts`:
+
+```ts
+export interface TaskStage {
+  id: string;
+  task_id: string;
+  user_id: string;
+  label: string;
+  position: number;
+  done: boolean;
+  done_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+```
+
+## Files touched
+
+- new migration: `task_stages` table + RLS + grants + done_at trigger
+- new: `src/components/task-stages-panel.tsx`
+- edit: `src/lib/ptops-types.ts`
+- edit: `src/lib/claude-agent/schemas.ts`, `actions.server.ts`
+- edit: `src/routes/api/public/claude-agent.ts`
+- edit: `src/routes/tasks.$id.tsx`, `src/routes/tasks.tsx`
+- edit: `/mnt/documents/claude-api-summary.md`
+
+## Open question (optional, default = no)
+
+When all stages are done, should task `status` auto-flip to `DONE`? Default plan: **no** (keep independent). Tell me if you want auto-complete instead.
