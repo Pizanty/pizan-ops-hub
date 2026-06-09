@@ -72,11 +72,13 @@ export async function get_dashboard(sb: SB, userId: string) {
   });
 
   const tasks = (tasksR.data ?? []) as any[];
+  const stageSummaries = await fetchStageSummaries(sb, tasks.map((t) => t.id));
   const leadsById = new Map(leads.map((l: any) => [l.id, l] as const));
   const tasksEnriched = tasks.map((t) => {
-    if (!t.lead_id) return t;
-    const l = leadsById.get(t.lead_id);
-    return l ? { ...t, lead: { id: l.id, name: l.name, stage: l.stage } } : t;
+    const withStages = attachStageSummary(t, stageSummaries.get(t.id));
+    if (!withStages.lead_id) return withStages;
+    const l = leadsById.get(withStages.lead_id);
+    return l ? { ...withStages, lead: { id: l.id, name: l.name, stage: l.stage } } : withStages;
   });
   const openStatuses = new Set(["TODO", "IN_PROGRESS", "BLOCKED"]);
   const tasksByLeadMap = new Map<string, any>();
