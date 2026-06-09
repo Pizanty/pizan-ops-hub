@@ -154,6 +154,7 @@ function TasksPage() {
                     <DomainBadge domain={t.domain} />
                     <PriorityDot priority={t.priority} />
                     <TaskStatusBadge status={t.status} />
+                    <StageProgress summary={stageSummary.get(t.id)} />
                     {t.due_date && (
                       <span className={"font-mono text-[10px] " + (isOverdue(t.due_date) && t.status !== "DONE" ? "text-destructive" : "text-muted-foreground")}>
                         {t.due_date}
