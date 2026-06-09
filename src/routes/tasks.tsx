@@ -45,6 +45,32 @@ function TasksPage() {
     },
   });
 
+  const { data: stageRows = [] } = useQuery({
+    queryKey: ["task_stages", "all", user?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("task_stages")
+        .select("task_id,done,position,label")
+        .eq("user_id", user!.id)
+        .order("position", { ascending: true });
+      if (error) throw error;
+      return data as { task_id: string; done: boolean; position: number; label: string }[];
+    },
+  });
+
+  const stageSummary = (() => {
+    const map = new Map<string, { total: number; done: number; current: string | null }>();
+    for (const r of stageRows) {
+      const e = map.get(r.task_id) ?? { total: 0, done: 0, current: null };
+      e.total += 1;
+      if (r.done) e.done += 1;
+      else if (e.current == null) e.current = r.label;
+      map.set(r.task_id, e);
+    }
+    return map;
+  })();
+
   const tasks = (() => {
     const active = rankTasks(allTasks);
     const completed = allTasks
@@ -128,6 +154,7 @@ function TasksPage() {
                     <DomainBadge domain={t.domain} />
                     <PriorityDot priority={t.priority} />
                     <TaskStatusBadge status={t.status} />
+                    <StageProgress summary={stageSummary.get(t.id)} />
                     {t.due_date && (
                       <span className={"font-mono text-[10px] " + (isOverdue(t.due_date) && t.status !== "DONE" ? "text-destructive" : "text-muted-foreground")}>
                         {t.due_date}
@@ -183,7 +210,7 @@ function TasksPage() {
                       </td>
                       <td className="px-3 py-2"><DomainBadge domain={t.domain} /></td>
                       <td className="px-3 py-2"><PriorityDot priority={t.priority} /></td>
-                      <td className="px-3 py-2"><TaskStatusBadge status={t.status} /></td>
+                      <td className="px-3 py-2"><div className="flex items-center gap-2"><TaskStatusBadge status={t.status} /><StageProgress summary={stageSummary.get(t.id)} /></div></td>
                       <td className={"px-3 py-2 font-mono text-xs " + (isOverdue(t.due_date) && t.status !== "DONE" ? "text-destructive" : "text-muted-foreground")}>{t.due_date ?? "—"}</td>
                       <td className="px-3 py-2 text-right">
                         <div className="flex justify-end gap-1">
@@ -293,3 +320,19 @@ function TaskSheet({ open, onOpenChange, task }: { open: boolean; onOpenChange: 
 }
 
 export { TaskSheet };
+
+function StageProgress({ summary }: { summary?: { total: number; done: number; current: string | null } }) {
+  if (!summary || summary.total === 0) return null;
+  const pct = Math.round((summary.done / summary.total) * 100);
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border bg-muted/40 px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
+      title={summary.current ? `Next: ${summary.current}` : "All stages done"}
+    >
+      <span className="relative inline-block h-1 w-8 overflow-hidden rounded-full bg-muted">
+        <span className="absolute inset-y-0 left-0 bg-gradient-primary" style={{ width: `${pct}%` }} />
+      </span>
+      {summary.done}/{summary.total}
+    </span>
+  );
+}

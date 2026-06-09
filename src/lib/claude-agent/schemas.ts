@@ -47,6 +47,7 @@ export const Schemas = {
     due_date: isoDate.optional(),
     notes: z.string().optional(),
     lead_id: uuid.optional(),
+    stages: z.array(z.string().min(1).max(255)).max(50).optional(),
   }),
   update_task: z.object({
     id: uuid,
@@ -180,6 +181,29 @@ export const Schemas = {
     content_base64: z.string().min(1),
   }),
   delete_attachment: z.object({ id: uuid }),
+
+  list_task_stages: z.object({ task_id: uuid }),
+  add_task_stage: z.object({
+    task_id: uuid,
+    label: z.string().min(1).max(255),
+    position: z.number().int().min(0).optional(),
+    done: z.boolean().optional(),
+  }),
+  update_task_stage: z.object({
+    id: uuid,
+    label: z.string().min(1).max(255).optional(),
+    position: z.number().int().min(0).optional(),
+    done: z.boolean().optional(),
+  }),
+  delete_task_stage: z.object({ id: uuid }),
+  reorder_task_stages: z.object({
+    task_id: uuid,
+    ordered_ids: z.array(uuid).min(1).max(100),
+  }),
+  set_task_stages: z.object({
+    task_id: uuid,
+    labels: z.array(z.string().min(1).max(255)).max(50),
+  }),
 };
 
 export const VALID_ACTIONS = [
@@ -218,6 +242,12 @@ export const VALID_ACTIONS = [
   "get_attachment",
   "upload_attachment",
   "delete_attachment",
+  "list_task_stages",
+  "add_task_stage",
+  "update_task_stage",
+  "delete_task_stage",
+  "reorder_task_stages",
+  "set_task_stages",
 ] as const;
 
 export type ActionName = (typeof VALID_ACTIONS)[number];

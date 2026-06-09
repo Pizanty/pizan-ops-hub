@@ -70,6 +70,12 @@ async function dispatch(action: string, userId: string, params: unknown): Promis
     case "get_attachment": return A.get_attachment(supabaseAdmin, userId, params);
     case "upload_attachment": return A.upload_attachment(supabaseAdmin, userId, params);
     case "delete_attachment": return A.delete_attachment(supabaseAdmin, userId, params);
+    case "list_task_stages": return A.list_task_stages(supabaseAdmin, userId, params);
+    case "add_task_stage": return A.add_task_stage(supabaseAdmin, userId, params);
+    case "update_task_stage": return A.update_task_stage(supabaseAdmin, userId, params);
+    case "delete_task_stage": return A.delete_task_stage(supabaseAdmin, userId, params);
+    case "reorder_task_stages": return A.reorder_task_stages(supabaseAdmin, userId, params);
+    case "set_task_stages": return A.set_task_stages(supabaseAdmin, userId, params);
     case "batch": {
       const parsed = (await import("@/lib/claude-agent/schemas")).Schemas.batch.parse(params);
       const results: Array<{ ok: boolean; action: string; data?: unknown; error?: string }> = [];

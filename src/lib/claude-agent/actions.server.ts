@@ -72,11 +72,13 @@ export async function get_dashboard(sb: SB, userId: string) {
   });
 
   const tasks = (tasksR.data ?? []) as any[];
+  const stageSummaries = await fetchStageSummaries(sb, tasks.map((t) => t.id));
   const leadsById = new Map(leads.map((l: any) => [l.id, l] as const));
   const tasksEnriched = tasks.map((t) => {
-    if (!t.lead_id) return t;
-    const l = leadsById.get(t.lead_id);
-    return l ? { ...t, lead: { id: l.id, name: l.name, stage: l.stage } } : t;
+    const withStages = attachStageSummary(t, stageSummaries.get(t.id));
+    if (!withStages.lead_id) return withStages;
+    const l = leadsById.get(withStages.lead_id);
+    return l ? { ...withStages, lead: { id: l.id, name: l.name, stage: l.stage } } : withStages;
   });
   const openStatuses = new Set(["TODO", "IN_PROGRESS", "BLOCKED"]);
   const tasksByLeadMap = new Map<string, any>();
@@ -112,6 +114,41 @@ export async function get_dashboard(sb: SB, userId: string) {
 }
 
 // ---------- TASKS ----------
+async function fetchStageSummaries(sb: SB, taskIds: string[]) {
+  if (taskIds.length === 0) return new Map<string, any>();
+  const { data, error } = await sb
+    .from("task_stages")
+    .select("task_id,label,position,done")
+    .in("task_id", taskIds)
+    .order("position", { ascending: true });
+  if (error) throw error;
+  const byTask = new Map<string, { label: string; position: number; done: boolean }[]>();
+  for (const r of (data ?? []) as any[]) {
+    const arr = byTask.get(r.task_id) ?? [];
+    arr.push(r);
+    byTask.set(r.task_id, arr);
+  }
+  const out = new Map<string, { stage_count: number; stages_done: number; progress_pct: number; current_stage: string | null }>();
+  for (const [id, stages] of byTask) {
+    const total = stages.length;
+    const done = stages.filter((s) => s.done).length;
+    const current = stages.find((s) => !s.done)?.label ?? null;
+    out.set(id, {
+      stage_count: total,
+      stages_done: done,
+      progress_pct: total ? Math.round((done / total) * 100) : 0,
+      current_stage: current,
+    });
+  }
+  return out;
+}
+
+function attachStageSummary(task: any, summary?: any) {
+  return summary
+    ? { ...task, ...summary }
+    : { ...task, stage_count: 0, stages_done: 0, progress_pct: 0, current_stage: null };
+}
+
 export async function list_tasks(sb: SB, userId: string, raw: unknown) {
   const p = Schemas.list_tasks.parse(raw ?? {});
   let q = sb.from("tasks").select("*").eq("user_id", userId);
@@ -129,21 +166,48 @@ export async function list_tasks(sb: SB, userId: string, raw: unknown) {
   q = q.order("priority", { ascending: true }).order("due_date", { ascending: true, nullsFirst: false }).limit(p.limit);
   const { data, error } = await q;
   if (error) throw error;
-  return data ?? [];
+  const rows = (data ?? []) as any[];
+  const summaries = await fetchStageSummaries(sb, rows.map((r) => r.id));
+  return rows.map((r) => attachStageSummary(r, summaries.get(r.id)));
 }
 
 export async function get_task(sb: SB, userId: string, raw: unknown) {
   const { id } = Schemas.get_task.parse(raw);
-  const { data, error } = await sb.from("tasks").select("*").eq("user_id", userId).eq("id", id).maybeSingle();
-  if (error) throw error;
-  if (!data) throw new Error("Task not found");
-  return data;
+  const [taskR, stagesR] = await Promise.all([
+    sb.from("tasks").select("*").eq("user_id", userId).eq("id", id).maybeSingle(),
+    sb.from("task_stages").select("*").eq("task_id", id).order("position", { ascending: true }),
+  ]);
+  if (taskR.error) throw taskR.error;
+  if (!taskR.data) throw new Error("Task not found");
+  if (stagesR.error) throw stagesR.error;
+  const stages = (stagesR.data ?? []) as any[];
+  const total = stages.length;
+  const done = stages.filter((s) => s.done).length;
+  return {
+    ...taskR.data,
+    stages,
+    stage_count: total,
+    stages_done: done,
+    progress_pct: total ? Math.round((done / total) * 100) : 0,
+    current_stage: stages.find((s) => !s.done)?.label ?? null,
+  };
 }
 
 export async function create_task(sb: SB, userId: string, raw: unknown) {
   const p = Schemas.create_task.parse(raw);
-  const { data, error } = await sb.from("tasks").insert({ ...p, user_id: userId }).select("*").single();
+  const { stages, ...taskPayload } = p as any;
+  const { data, error } = await sb.from("tasks").insert({ ...taskPayload, user_id: userId }).select("*").single();
   if (error) throw error;
+  if (Array.isArray(stages) && stages.length > 0) {
+    const rows = stages.map((label: string, i: number) => ({
+      task_id: data.id,
+      user_id: userId,
+      label,
+      position: i,
+    }));
+    const { error: sErr } = await sb.from("task_stages").insert(rows);
+    if (sErr) throw sErr;
+  }
   return data;
 }
 
@@ -166,6 +230,86 @@ export async function complete_task(sb: SB, userId: string, raw: unknown) {
   const { data, error } = await sb.from("tasks").update({ status: "DONE" }).eq("id", id).eq("user_id", userId).select("*").single();
   if (error) throw error;
   return data;
+}
+
+// ---------- TASK STAGES ----------
+async function ensureTaskOwned(sb: SB, userId: string, task_id: string) {
+  const { data, error } = await sb.from("tasks").select("id").eq("id", task_id).eq("user_id", userId).maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("Task not found");
+}
+
+export async function list_task_stages(sb: SB, userId: string, raw: unknown) {
+  const { task_id } = Schemas.list_task_stages.parse(raw);
+  await ensureTaskOwned(sb, userId, task_id);
+  const { data, error } = await sb.from("task_stages").select("*").eq("task_id", task_id).order("position", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function add_task_stage(sb: SB, userId: string, raw: unknown) {
+  const p = Schemas.add_task_stage.parse(raw);
+  await ensureTaskOwned(sb, userId, p.task_id);
+  let position = p.position;
+  if (position == null) {
+    const { data: last, error } = await sb
+      .from("task_stages").select("position")
+      .eq("task_id", p.task_id).order("position", { ascending: false }).limit(1).maybeSingle();
+    if (error) throw error;
+    position = last ? (last.position as number) + 1 : 0;
+  }
+  const { data, error } = await sb.from("task_stages").insert({
+    task_id: p.task_id,
+    user_id: userId,
+    label: p.label,
+    position,
+    done: p.done ?? false,
+  }).select("*").single();
+  if (error) throw error;
+  return data;
+}
+
+export async function update_task_stage(sb: SB, userId: string, raw: unknown) {
+  const { id, ...rest } = Schemas.update_task_stage.parse(raw);
+  const { data, error } = await sb.from("task_stages").update(rest).eq("id", id).eq("user_id", userId).select("*").single();
+  if (error) throw error;
+  return data;
+}
+
+export async function delete_task_stage(sb: SB, userId: string, raw: unknown) {
+  const { id } = Schemas.delete_task_stage.parse(raw);
+  const { error } = await sb.from("task_stages").delete().eq("id", id).eq("user_id", userId);
+  if (error) throw error;
+  return { id, deleted: true };
+}
+
+export async function reorder_task_stages(sb: SB, userId: string, raw: unknown) {
+  const { task_id, ordered_ids } = Schemas.reorder_task_stages.parse(raw);
+  await ensureTaskOwned(sb, userId, task_id);
+  for (let i = 0; i < ordered_ids.length; i++) {
+    const { error } = await sb.from("task_stages")
+      .update({ position: i })
+      .eq("id", ordered_ids[i]).eq("task_id", task_id).eq("user_id", userId);
+    if (error) throw error;
+  }
+  const { data, error } = await sb.from("task_stages").select("*").eq("task_id", task_id).order("position", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function set_task_stages(sb: SB, userId: string, raw: unknown) {
+  const { task_id, labels } = Schemas.set_task_stages.parse(raw);
+  await ensureTaskOwned(sb, userId, task_id);
+  const { error: delErr } = await sb.from("task_stages").delete().eq("task_id", task_id).eq("user_id", userId);
+  if (delErr) throw delErr;
+  if (labels.length > 0) {
+    const rows = labels.map((label, i) => ({ task_id, user_id: userId, label, position: i }));
+    const { error } = await sb.from("task_stages").insert(rows);
+    if (error) throw error;
+  }
+  const { data, error } = await sb.from("task_stages").select("*").eq("task_id", task_id).order("position", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
 }
 
 // ---------- LEADS ----------
