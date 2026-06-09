@@ -210,7 +210,7 @@ function TasksPage() {
                       </td>
                       <td className="px-3 py-2"><DomainBadge domain={t.domain} /></td>
                       <td className="px-3 py-2"><PriorityDot priority={t.priority} /></td>
-                      <td className="px-3 py-2"><TaskStatusBadge status={t.status} /></td>
+                      <td className="px-3 py-2"><div className="flex items-center gap-2"><TaskStatusBadge status={t.status} /><StageProgress summary={stageSummary.get(t.id)} /></div></td>
                       <td className={"px-3 py-2 font-mono text-xs " + (isOverdue(t.due_date) && t.status !== "DONE" ? "text-destructive" : "text-muted-foreground")}>{t.due_date ?? "—"}</td>
                       <td className="px-3 py-2 text-right">
                         <div className="flex justify-end gap-1">
