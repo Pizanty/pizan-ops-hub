@@ -80,6 +80,7 @@ function TaskDetail() {
                   Created {new Date(task.created_at).toLocaleString()}<br />
                   {task.completed_at && <>Completed {new Date(task.completed_at).toLocaleString()}</>}
                 </div>
+                <TaskStagesPanel taskId={task.id} />
                 <AttachmentsPanel entityType="task" entityId={task.id} />
               </div>
             </GlassDialogBody>
