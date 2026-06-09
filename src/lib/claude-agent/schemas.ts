@@ -47,6 +47,7 @@ export const Schemas = {
     due_date: isoDate.optional(),
     notes: z.string().optional(),
     lead_id: uuid.optional(),
+    stages: z.array(z.string().min(1).max(255)).max(50).optional(),
   }),
   update_task: z.object({
     id: uuid,
