@@ -100,7 +100,7 @@ function BrandMark() {
         <Sparkles className="h-4 w-4 text-primary-foreground" />
       </div>
       <div className="flex flex-col leading-tight">
-        <span className="font-display text-sm font-semibold tracking-tight">PTOPS</span>
+        <span className="font-display text-sm font-semibold tracking-tight">Tovanto</span>
         <span className="font-mono text-[10px] text-muted-foreground">PizanTech · v0.1</span>
       </div>
     </div>
