@@ -3,8 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { memo, useMemo, useState } from "react";
 import { ChevronRight, Plus, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
-import { zodValidator, fallback } from "@tanstack/zod-adapter";
-import { z } from "zod";
 import { AppShell, PageHeader } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,16 +16,21 @@ import { DEV_PRIORITIES, DEV_SEVERITIES, DEV_TYPES, type DevItem, type DevPriori
 import { DevPriorityBadge, SeverityBadge, EmptyState } from "@/lib/ptops-ui";
 import { cn } from "@/lib/utils";
 
-const searchSchema = z.object({
-  q: fallback(z.string(), "").default(""),
-  types: fallback(z.array(z.enum(DEV_TYPES)), []).default([]),
-  priorities: fallback(z.array(z.enum(DEV_PRIORITIES)), []).default([]),
-  mine: fallback(z.boolean(), false).default(false),
-});
+type DevSearch = { q: string; types: DevType[]; priorities: DevPriority[]; mine: boolean };
+
+function toArr<T extends string>(v: unknown, allowed: readonly T[]): T[] {
+  const raw = Array.isArray(v) ? v : typeof v === "string" && v ? v.split(",") : [];
+  return raw.filter((x): x is T => typeof x === "string" && (allowed as readonly string[]).includes(x));
+}
 
 export const Route = createFileRoute("/dev")({
   component: DevLayout,
-  validateSearch: zodValidator(searchSchema),
+  validateSearch: (search: Record<string, unknown>): DevSearch => ({
+    q: typeof search.q === "string" ? search.q : "",
+    types: toArr(search.types, DEV_TYPES),
+    priorities: toArr(search.priorities, DEV_PRIORITIES),
+    mine: search.mine === true || search.mine === "true",
+  }),
 });
 
 function DevLayout() {
