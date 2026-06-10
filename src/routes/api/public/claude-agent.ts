@@ -34,6 +34,26 @@ async function getAdminUserId(): Promise<string> {
   return data.user_id as string;
 }
 
+const IDAN_EMAIL = "idanach7972@gmail.com";
+async function getIdanUserId(): Promise<string> {
+  const { data, error } = await supabaseAdmin
+    .from("users").select("id").eq("email", IDAN_EMAIL).maybeSingle();
+  if (error) throw error;
+  if (!data?.id) throw new Error("Idan user not found");
+  return data.id as string;
+}
+
+// Actions Idan's token is allowed to invoke (dev items only).
+const IDAN_ALLOWED_ACTIONS = new Set<string>([
+  "list_dev_items",
+  "get_dev_item",
+  "create_dev_item",
+  "update_dev_item",
+  "delete_dev_item",
+  "list_unblocked",
+  "batch",
+]);
+
 async function dispatch(action: string, userId: string, params: unknown): Promise<unknown> {
   switch (action) {
     case "get_dashboard": return A.get_dashboard(supabaseAdmin, userId);
@@ -118,13 +138,18 @@ export const Route = createFileRoute("/api/public/claude-agent")({
           valid_actions: VALID_ACTIONS,
         }),
       POST: async ({ request }) => {
-        const expected = process.env.CLAUDE_AGENT_TOKEN;
-        if (!expected) {
+        const adminToken = process.env.CLAUDE_AGENT_TOKEN;
+        const idanToken = process.env.IDAN_AGENT_TOKEN;
+        if (!adminToken) {
           return json({ ok: false, error: "Server misconfigured: CLAUDE_AGENT_TOKEN not set" }, 500);
         }
         const auth = request.headers.get("authorization") ?? "";
         const m = auth.match(/^Bearer\s+(.+)$/i);
-        if (!m || !timingSafeEq(m[1], expected)) {
+        const presented = m?.[1];
+        let principal: "admin" | "idan" | null = null;
+        if (presented && timingSafeEq(presented, adminToken)) principal = "admin";
+        else if (presented && idanToken && timingSafeEq(presented, idanToken)) principal = "idan";
+        if (!principal) {
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
             headers: { "Content-Type": "application/json", ...CORS },
@@ -142,15 +167,28 @@ export const Route = createFileRoute("/api/public/claude-agent")({
           return json({ ok: false, error: "Missing 'action' field" });
         }
 
+        // Idan's token: restrict to dev_items allowlist (incl. nested batch ops).
+        if (principal === "idan") {
+          if (!IDAN_ALLOWED_ACTIONS.has(action)) {
+            return json({ ok: false, error: `Forbidden: action '${action}' not allowed for this token` }, 403);
+          }
+          if (action === "batch") {
+            const ops = (body.params as { operations?: Array<{ action?: string }> })?.operations ?? [];
+            for (const op of ops) {
+              if (!op.action || !IDAN_ALLOWED_ACTIONS.has(op.action) || op.action === "batch") {
+                return json({ ok: false, error: `Forbidden: batch action '${op.action}' not allowed for this token` }, 403);
+              }
+            }
+          }
+        }
+
         try {
-          const userId = await getAdminUserId();
+          const userId = principal === "idan" ? await getIdanUserId() : await getAdminUserId();
           const data = await dispatch(action, userId, body.params ?? {});
           return json({ ok: true, data });
         } catch (e: unknown) {
           const message = A.err(e, "Unknown error");
-          // Unknown-action errors and validation errors are logical 200s.
           if (message.startsWith("Unknown action:")) return json({ ok: false, error: message });
-          // Zod errors come through as Error with .message; treat all as 200 logical errors.
           return json({ ok: false, error: message });
         }
       },
