@@ -184,6 +184,29 @@ export const Route = createFileRoute("/api/public/claude-agent")({
 
         try {
           const userId = principal === "idan" ? await getIdanUserId() : await getAdminUserId();
+
+          // For Idan's token: enforce ownership on dev_item mutations.
+          // He can only update/delete dev_items he created.
+          if (principal === "idan") {
+            const mutating = ["update_dev_item", "delete_dev_item"];
+            const opsToCheck: Array<{ action: string; params?: unknown }> =
+              action === "batch"
+                ? ((body.params as { operations?: Array<{ action: string; params?: unknown }> })?.operations ?? [])
+                : [{ action, params: body.params }];
+            for (const op of opsToCheck) {
+              if (!mutating.includes(op.action)) continue;
+              const targetId = (op.params as { id?: string } | undefined)?.id;
+              if (!targetId) continue; // schema validation will catch it later
+              const { data: row, error: ownErr } = await supabaseAdmin
+                .from("dev_items").select("created_by").eq("id", targetId).maybeSingle();
+              if (ownErr) return json({ ok: false, error: ownErr.message }, 500);
+              if (!row) return json({ ok: false, error: `Dev item ${targetId} not found` }, 404);
+              if (row.created_by !== userId) {
+                return json({ ok: false, error: `Forbidden: dev_item ${targetId} is not owned by this token's user` }, 403);
+              }
+            }
+          }
+
           const data = await dispatch(action, userId, body.params ?? {});
           return json({ ok: true, data });
         } catch (e: unknown) {
