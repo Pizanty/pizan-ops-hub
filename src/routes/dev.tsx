@@ -1,8 +1,10 @@
-import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { memo, useMemo, useState } from "react";
+import { ChevronRight, Plus, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import { AppShell, PageHeader } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,8 +16,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { DEV_PRIORITIES, DEV_SEVERITIES, DEV_TYPES, type DevItem, type DevPriority, type DevSeverity, type DevStatus, type DevType } from "@/lib/ptops-types";
 import { DevPriorityBadge, SeverityBadge, EmptyState } from "@/lib/ptops-ui";
+import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/dev")({ component: DevLayout });
+const searchSchema = z.object({
+  q: fallback(z.string(), "").default(""),
+  types: fallback(z.array(z.enum(DEV_TYPES)), []).default([]),
+  priorities: fallback(z.array(z.enum(DEV_PRIORITIES)), []).default([]),
+  mine: fallback(z.boolean(), false).default(false),
+});
+
+export const Route = createFileRoute("/dev")({
+  component: DevLayout,
+  validateSearch: zodValidator(searchSchema),
+});
 
 function DevLayout() {
   return (
