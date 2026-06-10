@@ -42,9 +42,19 @@ function DevLayout() {
   );
 }
 
+const STATUS_TONE: Record<DevStatus, { dot: string; text: string }> = {
+  OPEN: { dot: "bg-sky-400", text: "text-sky-400" },
+  IN_PROGRESS: { dot: "bg-amber-400", text: "text-amber-400" },
+  BLOCKED: { dot: "bg-rose-400", text: "text-rose-400" },
+  RESOLVED: { dot: "bg-emerald-400", text: "text-emerald-400" },
+  WONT_FIX: { dot: "bg-zinc-500", text: "text-zinc-500" },
+};
+
 function DevPage() {
   const { user, role } = useAuth();
   const qc = useQueryClient();
+  const navigate = useNavigate({ from: "/dev" });
+  const search = Route.useSearch();
   const isAdmin = role === "admin";
   const [open, setOpen] = useState(false);
   const { data: items = [], isLoading } = useQuery({
@@ -83,7 +93,33 @@ function DevPage() {
   });
 
   const cols: DevStatus[] = ["OPEN", "IN_PROGRESS", "BLOCKED", "RESOLVED", "WONT_FIX"];
-  const nonMilestoneItems = items.filter((i) => !i.is_milestone);
+  const nonMilestoneItems = useMemo(() => items.filter((i) => !i.is_milestone), [items]);
+
+  // ----- Filtering -----
+  const q = search.q.trim().toLowerCase();
+  const filtered = useMemo(() => {
+    return nonMilestoneItems.filter((i) => {
+      if (q && !i.title.toLowerCase().includes(q)) return false;
+      if (search.types.length > 0 && !search.types.includes(i.type)) return false;
+      if (search.priorities.length > 0 && !search.priorities.includes(i.priority)) return false;
+      if (search.mine && user?.id && i.created_by !== user.id && i.assigned_to !== user.id) return false;
+      return true;
+    });
+  }, [nonMilestoneItems, q, search.types, search.priorities, search.mine, user?.id]);
+
+  const totalCounts = useMemo(() => {
+    const m = new Map<DevStatus, number>();
+    for (const i of filtered) m.set(i.status, (m.get(i.status) ?? 0) + 1);
+    return m;
+  }, [filtered]);
+
+  const setSearch = (patch: Partial<DevSearch>) => {
+    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+  };
+  const toggleInArr = <T extends string>(arr: T[], v: T): T[] =>
+    arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
+
+  const hasActiveFilters = q.length > 0 || search.types.length > 0 || search.priorities.length > 0 || search.mine;
 
   return (
     <>
@@ -125,43 +161,90 @@ function DevPage() {
             </div>
           </div>
         )}
+
+        {/* Filter bar */}
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card/40 p-2">
+          <div className="relative min-w-0 flex-1 sm:flex-initial sm:w-64">
+            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search.q}
+              onChange={(e) => setSearch({ q: e.target.value })}
+              placeholder="Search title…"
+              className="h-8 pl-7 text-sm"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-1">
+            {DEV_TYPES.filter((t) => t !== "MILESTONE").map((t) => {
+              const active = search.types.includes(t);
+              return (
+                <button
+                  key={t}
+                  onClick={() => setSearch({ types: toggleInArr(search.types, t) })}
+                  className={cn(
+                    "rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase transition",
+                    active ? "border-primary/60 bg-primary/15 text-primary" : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground",
+                  )}
+                >{t}</button>
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap items-center gap-1">
+            {DEV_PRIORITIES.map((p) => {
+              const active = search.priorities.includes(p);
+              return (
+                <button
+                  key={p}
+                  onClick={() => setSearch({ priorities: toggleInArr(search.priorities, p) })}
+                  className={cn(
+                    "rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase transition",
+                    active ? "border-primary/60 bg-primary/15 text-primary" : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground",
+                  )}
+                >{p}</button>
+              );
+            })}
+          </div>
+          <button
+            onClick={() => setSearch({ mine: !search.mine })}
+            className={cn(
+              "rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase transition",
+              search.mine ? "border-primary/60 bg-primary/15 text-primary" : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground",
+            )}
+          >Mine</button>
+          {hasActiveFilters && (
+            <button
+              onClick={() => navigate({ search: { q: "", types: [], priorities: [], mine: false }, replace: true })}
+              className="flex items-center gap-1 rounded-full border border-border px-2 py-0.5 font-mono text-[10px] uppercase text-muted-foreground hover:border-destructive/40 hover:text-destructive"
+            ><X className="h-3 w-3" /> Reset</button>
+          )}
+        </div>
+
         {isLoading ? <div className="text-sm text-muted-foreground">Loading…</div> :
           nonMilestoneItems.length === 0 && milestones.length === 0 ? <EmptyState title="No items" hint={isAdmin ? "Create your first dev item." : "Nothing assigned to you yet."} /> :
           <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:snap-none md:grid-cols-2 md:overflow-visible md:px-0 md:pb-0 xl:grid-cols-5">
             {cols.map((status) => {
-              const list = nonMilestoneItems.filter((i) => i.status === status);
+              const list = filtered.filter((i) => i.status === status);
+              const tone = STATUS_TONE[status];
               return (
-                <div key={status} className="w-[80vw] shrink-0 snap-start rounded-lg border bg-card/40 p-2 md:w-auto md:shrink">
-                  <div className="mb-2 flex items-center justify-between px-1">
-                    <span className="font-mono text-[10px] uppercase text-muted-foreground">{status.replace("_", " ")}</span>
-                    <span className="font-mono text-[10px] text-muted-foreground">{list.length}</span>
+                <div key={status} className="flex w-[82vw] shrink-0 snap-start flex-col rounded-lg border bg-card/40 p-2 md:w-auto md:min-w-0 md:shrink">
+                  <div className="mb-2 flex min-w-0 items-center justify-between px-1">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", tone.dot)} />
+                      <span className={cn("truncate font-mono text-[10px] uppercase", tone.text)}>{status.replace("_", " ")}</span>
+                    </div>
+                    <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{list.length}</span>
                   </div>
-                  <div className="space-y-2">
-                    {list.map((i) => (
-                      <div key={i.id} className="group relative rounded-md border bg-card p-2 text-sm hover:border-primary/50">
-                        <Link to="/dev/$id" params={{ id: i.id }} className="block">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-mono text-[10px] text-muted-foreground">{i.type}</span>
-                            <DevPriorityBadge priority={i.priority} />
-                            {i.type === "BUG" && <SeverityBadge severity={i.severity} />}
-                            {unblockedIds.has(i.id) && <span className="rounded border border-[var(--color-success)]/30 bg-[var(--color-success)]/10 px-1.5 py-0.5 font-mono text-[10px] text-[var(--color-success)]">ready</span>}
-                          </div>
-                          <div className="mt-1 font-medium">{i.title}</div>
-                          {(i.blocked_by?.length ?? 0) > 0 && (
-                            <div className="mt-1 font-mono text-[10px] text-muted-foreground">blocked by {i.blocked_by.length}</div>
-                          )}
-                          {i.target_date && <div className="mt-1 font-mono text-[10px] text-muted-foreground">{i.target_date}</div>}
-                        </Link>
-                        {isAdmin && (
-                          <button
-                            aria-label="Delete"
-                            onClick={(e) => { e.preventDefault(); if (confirm(`Delete "${i.title}"?`)) del.mutate(i.id); }}
-                            className="absolute right-1 top-1 rounded p-1 text-muted-foreground opacity-0 transition hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-                          ><Trash2 className="h-3.5 w-3.5" /></button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  {list.length === 0 ? (
+                    <div className="rounded border border-dashed border-border/60 px-2 py-3 text-center font-mono text-[10px] text-muted-foreground">
+                      {totalCounts.get(status) ? "no match" : "empty"}
+                    </div>
+                  ) : (
+                    <StatusColumnBody
+                      items={list}
+                      isAdmin={isAdmin}
+                      unblockedIds={unblockedIds}
+                      onDelete={(id, title) => { if (confirm(`Delete "${title}"?`)) del.mutate(id); }}
+                    />
+                  )}
                 </div>
               );
             })}
