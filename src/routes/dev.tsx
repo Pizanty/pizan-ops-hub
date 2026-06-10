@@ -114,7 +114,7 @@ function DevPage() {
   }, [filtered]);
 
   const setSearch = (patch: Partial<DevSearch>) => {
-    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+    navigate({ search: (prev: DevSearch) => ({ ...prev, ...patch }), replace: true });
   };
   const toggleInArr = <T extends string>(arr: T[], v: T): T[] =>
     arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
