@@ -367,7 +367,7 @@ function StatusColumnBody({ items, isAdmin, unblockedIds, onDelete }: ColumnBody
   const buckets = useMemo(() => {
     const m = new Map<DevPriority, DevItem[]>();
     for (const p of DEV_PRIORITIES) m.set(p, []);
-    for (const i of items) m.get(i.priority)?.push(i);
+    for (const i of items) m.get((i.priority ?? "P3") as DevPriority)?.push(i);
     return m;
   }, [items]);
 
