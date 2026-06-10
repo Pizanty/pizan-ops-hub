@@ -348,3 +348,148 @@ function DevSheet({ open, onOpenChange, items }: { open: boolean; onOpenChange: 
     </GlassDialog>
   );
 }
+
+// ---------- Status column body: groups items by priority into buckets ----------
+const PRIO_META: Record<DevPriority, { label: string; tone: string; defaultOpen: boolean }> = {
+  P1: { label: "P1 · High", tone: "text-rose-300", defaultOpen: true },
+  P2: { label: "P2 · Medium", tone: "text-amber-300", defaultOpen: true },
+  P3: { label: "P3 · Low", tone: "text-zinc-400", defaultOpen: false },
+};
+
+type ColumnBodyProps = {
+  items: DevItem[];
+  isAdmin: boolean;
+  unblockedIds: Set<string>;
+  onDelete: (id: string, title: string) => void;
+};
+
+function StatusColumnBody({ items, isAdmin, unblockedIds, onDelete }: ColumnBodyProps) {
+  const buckets = useMemo(() => {
+    const m = new Map<DevPriority, DevItem[]>();
+    for (const p of DEV_PRIORITIES) m.set(p, []);
+    for (const i of items) m.get(i.priority)?.push(i);
+    return m;
+  }, [items]);
+
+  return (
+    <div className="space-y-2">
+      {DEV_PRIORITIES.map((p) => {
+        const list = buckets.get(p) ?? [];
+        if (list.length === 0) return null;
+        return (
+          <PriorityBucket
+            key={p}
+            label={PRIO_META[p].label}
+            tone={PRIO_META[p].tone}
+            defaultOpen={PRIO_META[p].defaultOpen}
+            items={list}
+            isAdmin={isAdmin}
+            unblockedIds={unblockedIds}
+            onDelete={onDelete}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function PriorityBucket({
+  label, tone, defaultOpen, items, isAdmin, unblockedIds, onDelete,
+}: {
+  label: string;
+  tone: string;
+  defaultOpen: boolean;
+  items: DevItem[];
+  isAdmin: boolean;
+  unblockedIds: Set<string>;
+  onDelete: (id: string, title: string) => void;
+}) {
+  const PREVIEW = 5;
+  const [open, setOpen] = useState(defaultOpen);
+  const [expanded, setExpanded] = useState(false);
+  const showAll = expanded || items.length <= PREVIEW;
+  const visible = showAll ? items : items.slice(0, PREVIEW);
+  const hiddenCount = items.length - visible.length;
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left transition hover:bg-card/70"
+      >
+        <ChevronRight className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
+        <span className={cn("min-w-0 truncate font-mono text-[10px] uppercase tracking-wide", tone)}>{label}</span>
+        <span className="ml-auto shrink-0 font-mono text-[10px] text-muted-foreground">{items.length}</span>
+      </button>
+      {open && (
+        <div className="mt-1 space-y-1.5 pl-1">
+          {visible.map((i) => (
+            <DevCard
+              key={i.id}
+              item={i}
+              isAdmin={isAdmin}
+              ready={unblockedIds.has(i.id)}
+              onDelete={onDelete}
+            />
+          ))}
+          {hiddenCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setExpanded(true)}
+              className="w-full rounded border border-dashed border-border/60 px-2 py-1 font-mono text-[10px] uppercase text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
+            >Show {hiddenCount} more</button>
+          )}
+          {expanded && items.length > PREVIEW && (
+            <button
+              type="button"
+              onClick={() => setExpanded(false)}
+              className="w-full rounded px-2 py-0.5 font-mono text-[10px] uppercase text-muted-foreground hover:text-foreground"
+            >Collapse</button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const DevCard = memo(function DevCard({
+  item, isAdmin, ready, onDelete,
+}: {
+  item: DevItem;
+  isAdmin: boolean;
+  ready: boolean;
+  onDelete: (id: string, title: string) => void;
+}) {
+  // Only show target date if within 7 days or overdue.
+  const showDate = !!item.target_date && (() => {
+    const t = new Date(item.target_date).getTime();
+    if (Number.isNaN(t)) return false;
+    const days = (t - Date.now()) / 86400000;
+    return days < 7;
+  })();
+  const blockCount = item.blocked_by?.length ?? 0;
+
+  return (
+    <div className="group relative rounded-md border bg-card p-2 text-sm hover:border-primary/50">
+      <Link to="/dev/$id" params={{ id: item.id }} className="block min-w-0">
+        <div className="flex min-w-0 flex-wrap items-center gap-1">
+          <span className="font-mono text-[10px] uppercase text-muted-foreground">{item.type}</span>
+          <DevPriorityBadge priority={item.priority} />
+          {item.type === "BUG" && <SeverityBadge severity={item.severity} />}
+          {ready && <span className="rounded border border-[var(--color-success)]/30 bg-[var(--color-success)]/10 px-1.5 py-0.5 font-mono text-[10px] text-[var(--color-success)]">ready</span>}
+          {blockCount > 0 && <span className="rounded border border-rose-400/30 bg-rose-400/10 px-1.5 py-0.5 font-mono text-[10px] text-rose-300">blk {blockCount}</span>}
+        </div>
+        <div className="mt-1 line-clamp-2 break-words text-[13px] font-medium leading-snug">{item.title}</div>
+        {showDate && <div className="mt-1 font-mono text-[10px] text-amber-300">due {item.target_date}</div>}
+      </Link>
+      {isAdmin && (
+        <button
+          aria-label="Delete"
+          onClick={(e) => { e.preventDefault(); onDelete(item.id, item.title); }}
+          className="absolute right-1 top-1 rounded p-1 text-muted-foreground opacity-0 transition hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+        ><Trash2 className="h-3.5 w-3.5" /></button>
+      )}
+    </div>
+  );
+});
