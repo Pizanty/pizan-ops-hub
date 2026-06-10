@@ -482,12 +482,49 @@ export async function create_dev_item(sb: SB, userId: string, raw: unknown) {
   return data;
 }
 
-export async function update_dev_item(sb: SB, _userId: string, raw: unknown) {
+export async function update_dev_item(sb: SB, userId: string, raw: unknown) {
   const { id, ...rest } = Schemas.update_dev_item.parse(raw);
   const payload: Record<string, unknown> = { ...rest };
   if (rest.status === "RESOLVED") payload.resolved_at = new Date().toISOString();
+
+  // Fetch previous state so we can mirror the log_dev_item_changes trigger.
+  // The DB trigger uses auth.uid() which is null when called via service_role,
+  // so we manually emit audit rows here using the supplied userId.
+  const beforeR = await sb.from("dev_items").select("*").eq("id", id).maybeSingle();
+  if (beforeR.error) throw beforeR.error;
+  const before = beforeR.data as Record<string, unknown> | null;
+
   const { data, error } = await sb.from("dev_items").update(payload).eq("id", id).select("*").single();
   if (error) throw error;
+
+  if (before && userId) {
+    const audit: Array<{ dev_item_id: string; user_id: string; field_changed: string; old_value: string | null; new_value: string | null }> = [];
+    const tracked: Array<{ field: string; transform?: (v: unknown) => string | null }> = [
+      { field: "status" },
+      { field: "assigned_to", transform: (v) => (v == null ? null : String(v)) },
+      { field: "severity" },
+      { field: "target_date", transform: (v) => (v == null ? null : String(v)) },
+      { field: "notes", transform: (v) => (v == null ? null : String(v).slice(0, 200)) },
+    ];
+    for (const { field, transform } of tracked) {
+      if (!(field in payload)) continue;
+      const oldV = before[field];
+      const newV = (data as Record<string, unknown>)[field];
+      if (oldV === newV) continue;
+      audit.push({
+        dev_item_id: id,
+        user_id: userId,
+        field_changed: field,
+        old_value: transform ? transform(oldV) : (oldV as string | null),
+        new_value: transform ? transform(newV) : (newV as string | null),
+      });
+    }
+    if (audit.length > 0) {
+      const { error: logErr } = await sb.from("dev_item_updates").insert(audit);
+      if (logErr) console.error("[update_dev_item] audit log failed:", logErr.message);
+    }
+  }
+
   return data;
 }
 
